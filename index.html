@@ -79,6 +79,10 @@
             ::selection { background: var(--border-color) !important; color: var(--text-color); }
         }
 
+        @media (max-width: 650px) {
+            .ce-popover, .ce-settings, .ce-inline-toolbar { bottom: var(--keyboard-offset, 0px) !important; max-height: calc(100vh - var(--keyboard-offset, 0px) - 20px) !important; transition: bottom 0.2s cubic-bezier(0.1, 0.7, 0.1, 1), max-height 0.2s ease; }
+        }
+
         /* --- STYLISH BRUTALIST HEADER & AI SUBTITLE --- */
         #date-header { 
             text-align: left; font-size: clamp(60px, 18vw, 150px); font-weight: 900; 
@@ -87,8 +91,8 @@
             cursor: pointer; transition: opacity 0.2s; user-select: none; white-space: nowrap; 
         }
         #date-header:hover { opacity: 0.7; }
+        #date-header:active { opacity: 0.5; }
         
-        /* The subtle AI status line */
         .ai-inline-status {
             font-family: var(--font-main);
             font-size: 13px;
@@ -99,7 +103,6 @@
             transition: opacity 0.3s ease;
             user-select: none;
             display: inline-block;
-            text-transform: lowercase;
         }
         .ai-inline-status.loading { animation: pulse-opacity 2s infinite ease-in-out; }
         .ai-inline-status.error { color: #ef4444; opacity: 1; }
@@ -107,12 +110,10 @@
 
         .ce-block-time { font-size: 11px; color: var(--muted-text); text-align: right; padding-top: 6px; padding-bottom: 2px; padding-right: 2px; user-select: none; opacity: 0.7; font-weight: 500; }
         
-        /* --- AI STREAM BLOCK STYLES --- */
-        .ai-stream-wrapper { margin: 16px 0; padding: 20px; border: 1px solid var(--border-color); border-radius: var(--std-border-radius); background: var(--recall-bg); border-left: 4px solid #a855f7; position: relative; }
-        .ai-stream-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 12px; font-weight: 700; color: #a855f7; text-transform: uppercase; letter-spacing: 0.5px; }
-        .ai-stream-prompt { font-size: 15px; font-weight: 600; color: var(--text-color); margin-bottom: 16px; font-style: italic; opacity: 0.8; }
-        .ai-stream-content { font-family: var(--font-main); font-size: 15px; color: var(--text-color); line-height: 1.6; white-space: pre-wrap; }
-        .ai-cursor { display: inline-block; width: 6px; height: 16px; background-color: #a855f7; margin-left: 4px; animation: blink 1s step-end infinite; vertical-align: text-bottom; }
+        /* --- SEAMLESS AI STREAM BLOCK STYLES --- */
+        .ai-stream-wrapper { margin: 4px 0; padding: 4px 0; position: relative; }
+        .ai-stream-content { font-family: var(--font-main); font-size: 16px; color: var(--text-color); line-height: 1.6; white-space: pre-wrap; outline: none; }
+        .ai-cursor { display: inline-block; width: 8px; height: 1em; background-color: #a855f7; margin-left: 2px; animation: blink 1s step-end infinite; vertical-align: text-bottom; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
         /* --- TOOL STYLES --- */
@@ -122,12 +123,14 @@
         .cal-btn.primary { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
         .cal-btn.primary:hover { opacity: 0.9; }
         .tool-title-input { width: 100%; border: none; background: transparent; color: var(--text-color); font-size: 16px; font-weight: 600; outline: none; font-family: inherit; padding: 4px 0; margin-bottom: 8px; }
+        .tool-title-input::placeholder { color: var(--muted-text); font-weight: 500; opacity: 0.6; }
 
-        .global-calendar-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); z-index: 100000; display: none; align-items: center; justify-content: center; opacity: 0; backdrop-filter: blur(2px); }
+        .global-calendar-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); z-index: 100000; display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s ease; backdrop-filter: blur(2px); }
         .global-calendar-modal.show { display: flex; opacity: 1; }
         .cp-container { background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; width: 90%; max-width: 340px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 12px; }
         .cp-header { display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
         .cp-header button { background: var(--muted-bg); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 6px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .cp-header button:hover { background: var(--editor-hover-bg); }
         .cp-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 12px; color: var(--muted-text); font-weight: 600; margin-bottom: 4px; }
         .cp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
         .cp-day { padding: 8px 0; text-align: center; font-size: 14px; cursor: pointer; border-radius: 6px; color: var(--text-color); transition: background 0.1s; }
@@ -139,6 +142,7 @@
 
         .compute-tool-container { border: 1px solid var(--border-color); border-radius: var(--std-border-radius); background: var(--muted-bg); overflow: hidden; margin: 8px 0; display: flex; flex-direction: column; }
         .compute-input { width: 100%; padding: 16px 16px 12px 16px; background: transparent; border: none; outline: none; font-family: monospace; font-size: 14px; color: var(--text-color); resize: none; box-sizing: border-box; line-height: 1.5; min-height: 50px; font-weight: bold; }
+        .compute-input::placeholder { color: var(--muted-text); opacity: 0.5; font-weight: normal; }
         .compute-output { padding: 12px 16px; border-top: 1px dashed var(--border-color); font-family: monospace; font-size: 16px; font-weight: 700; color: var(--text-color); background: var(--bg-color); word-break: break-word; min-height: 20px; }
         .compute-error { color: #EF4444; font-weight: 400; font-size: 13px; }
 
@@ -158,9 +162,11 @@
         .recall-dropdown { position: absolute; top: 100%; left: 0; width: 100%; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: var(--std-border-radius); margin-top: 4px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); z-index: 1000; max-height: 250px; overflow-y: auto; display: none; }
         .recall-dropdown.active { display: block; }
         .recall-result-item { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 4px; }
+        .recall-result-item:last-child { border-bottom: none; }
         .recall-result-item:hover { background: var(--editor-hover-bg); }
         .recall-result-meta { font-size: 11px; color: var(--text-color); font-weight: 600; opacity: 0.7; }
         .recall-result-snippet { font-size: 14px; color: var(--muted-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
         .recalled-block { margin: 8px 0; padding: 12px 16px; background: var(--recall-bg); border-left: 4px solid var(--recall-border); border-radius: 4px var(--std-border-radius) var(--std-border-radius) 4px; position: relative; }
         .recalled-orig-meta { font-size: 10px; color: var(--muted-text); font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
         .recalled-orig-meta svg { width: 12px; height: 12px; }
@@ -170,7 +176,9 @@
         .cal-header svg { color: var(--muted-text); }
         .cal-title { flex-grow: 1; border: none; background: transparent; color: var(--text-color); font-size: 18px; font-weight: 600; outline: none; font-family: inherit; }
         .cal-display-btn { border: 1px solid var(--border-color); background: var(--muted-bg); color: var(--text-color); border-radius: 6px; padding: 10px 14px; font-family: inherit; font-size: 14px; outline: none; cursor: pointer; text-align: left; display: flex; align-items: center; justify-content: space-between; }
+        .cal-display-btn:hover { background: var(--editor-hover-bg); }
         .cal-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .cal-actions .cal-btn { flex: 1; min-width: 130px; }
 
         .voice-tool-container { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
         .v-memo__btn { width: var(--std-control-height); height: var(--std-control-height); border-radius: 50%; border: 1px solid var(--border-color); background: var(--muted-bg); cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-color); flex-shrink: 0; min-width: var(--std-control-height); transition: all 0.2s; }
@@ -181,33 +189,29 @@
         .v-memo__status { font-size: 13px; color: var(--muted-text); white-space: nowrap; font-weight: 500; }
         
         .smart-canvas-selector { display: flex; gap: 12px; padding: 12px 0; justify-content: center; flex-wrap: wrap; }
-        .smart-canvas-option { flex: 1; min-width: 100px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 24px 10px; border: 1px dashed var(--border-color); border-radius: 8px; background: transparent; color: var(--text-color); cursor: pointer; transition: all 0.2s; font-size: 13px; font-weight: 500; }
+        .smart-canvas-option { flex: 1; min-width: 100px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 24px 10px; border: 1px dashed var(--border-color); border-radius: 8px; background: transparent; color: var(--text-color); cursor: pointer; transition: all 0.2s; font-size: 13px; font-weight: 500; font-family: inherit; }
         .smart-canvas-option:hover { background: var(--editor-hover-bg); border-style: solid; }
-        .smart-canvas-option svg { width: 32px; height: 32px; color: var(--muted-text); }
+        .smart-canvas-option svg { width: 32px; height: 32px; color: var(--muted-text); transition: color 0.2s; }
+        
         .canvas-relative-frame { position: relative; width: 100%; border-radius: var(--std-border-radius); border: 1px solid var(--border-color); overflow: hidden; margin: 8px 0; }
         .block-controls-stack { position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 401 !important; }
-        .canvas-action-btn { width: 32px; height: 32px; border-radius: 6px; background: var(--editor-toolbar-bg); border: 1px solid var(--border-color); color: var(--text-color); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0.8; }
+        .canvas-action-btn { width: 32px; height: 32px; border-radius: 6px; background: var(--editor-toolbar-bg); border: 1px solid var(--border-color); color: var(--text-color); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0.8; transition: all 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
         .canvas-action-btn.active { background: var(--text-color); color: var(--bg-color); opacity: 1; border-color: var(--text-color); }
+        
         .leaflet-container { background: var(--bg-color) !important; z-index: 1 !important; width: 100%; height: 400px; border: none; }
         .leaflet-container.drawing-mode, .leaflet-container.drawing-mode .leaflet-interactive { cursor: crosshair !important; touch-action: none; }
         .leaflet-container.locked-mode { cursor: default !important; }
-
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
     </style>
 </head>
 <body>
 
     <div class="app-container">
-        <!-- The Brutalist Header -->
         <div id="date-header"></div>
-
-        <!-- Ambient Small AI Status under Date -->
         <div id="ai-inline-status" class="ai-inline-status loading">initializing...</div>
-
         <div id="editorjs"></div>
     </div>
 
-    <!-- UI Modal -->
+    <!-- Modals -->
     <div id="global-calendar-modal" class="global-calendar-modal">
         <div class="cp-container" onclick="event.stopPropagation()">
             <div class="cp-header">
@@ -229,21 +233,16 @@
         </div>
     </div>
 
-    <!-- MAIN APP SCRIPT -->
     <script type="module">
         // ============================================================================
-        // ⚙️ INFINITE NOTES CONFIGURATION
+        // ⚙️ AI & APP CONFIGURATION
         // ============================================================================
         const CONFIG = {
-            // 🤖 AI SETTINGS (Edit these to customize your AI Collaborator)
-            AI_NAME: "Broski", // The name you use to call it (e.g. typing "@nova")
+            AI_NAME: "bro", 
             AI_PERSONALITY: "You are intelligent, youre chill, you leadn quick and your have a flawless memory. youre a bro",
-            
-            // App settings
             PWA_LOGO_URL: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzAwMDAwMCI+PHBhdGggZD0iTTE0IDJINmEyIDIgMCAwIDAtMiAydjE2YTIgMiAwIDAgMCAyIDJoMTJhMiAyIDAgMCAwIDItMlY4bC02LTZ6Ii8+PC9zdmc+"
         };
 
-        // --- Apply Global Configurations ---
         document.getElementById('pwa-icon').href = CONFIG.PWA_LOGO_URL;
         document.getElementById('pwa-manifest').href = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(JSON.stringify({
             "name": "Infinite Notes", "short_name": "Notes", "start_url": ".", "display": "standalone",
@@ -251,6 +250,11 @@
             "theme_color": window.matchMedia('(prefers-color-scheme: dark)').matches ? "#121212" : "#ffffff",
             "icons": [{"src": CONFIG.PWA_LOGO_URL, "sizes": "192x192", "type": "image/svg+xml"}]
         }));
+
+        if (window.visualViewport) {
+            const updateKeyboardOffset = () => { document.documentElement.style.setProperty('--keyboard-offset', `${Math.max(0, window.innerHeight - window.visualViewport.height)}px`); };
+            window.visualViewport.addEventListener('resize', updateKeyboardOffset); updateKeyboardOffset();
+        }
 
         const ICONS = {
             mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>',
@@ -270,8 +274,7 @@
             search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>',
             recall: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline><polyline points="12 7 12 12 15 15"></polyline></svg>',
             scan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h3"></path><path d="M20 7V4h-3"></path><path d="M4 17v3h3"></path><path d="M20 17v3h-3"></path><line x1="8" y1="12" x2="16" y2="12"></line></svg>',
-            compute: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 13 8 18 8"></polyline><circle cx="20" cy="8" r="2"></circle><circle cx="2" cy="14" r="2"></circle></svg>',
-            ai: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2z"></path><path d="M8 12h.01M12 12h.01M16 12h.01"></path></svg>'
+            compute: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 14 10 14 13 8 18 8"></polyline><circle cx="20" cy="8" r="2"></circle><circle cx="2" cy="14" r="2"></circle></svg>'
         };
 
         function createEl(tag, classNames = '', attributes = {}, children = []) {
@@ -293,7 +296,7 @@
         function getLocalYYYYMMDD(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 
         // ============================================================================
-        // DATABASE ADAPTER SYSTEM
+        // DATABASE ADAPTER
         // ============================================================================
         class IndexedDBAdapter {
             constructor() { this.dbName = 'InfiniteNotesDB'; this.storeName = 'daily_notes'; this.cache = {}; this.isMemoryOnly = false; }
@@ -303,7 +306,7 @@
                         const req = indexedDB.open(this.dbName, 1);
                         req.onupgradeneeded = (e) => { e.target.result.createObjectStore(this.storeName); };
                         req.onsuccess = (e) => { this.db = e.target.result; this.loadAll().then(data => { this.cache = data; resolve(); }); };
-                        req.onerror = (e) => { this.isMemoryOnly = true; resolve(); };
+                        req.onerror = () => { this.isMemoryOnly = true; resolve(); };
                     } catch(e) { this.isMemoryOnly = true; resolve(); }
                 });
             }
@@ -326,7 +329,7 @@
         let appDB = new IndexedDBAdapter();
 
         // ============================================================================
-        // GLOBAL UI: DATE PICKER MODAL
+        // DATE PICKER MODAL
         // ============================================================================
         const DatePicker = (function() {
             let activeDate, viewDate, onConfirm, config;
@@ -390,10 +393,9 @@
         })();
 
         // ============================================================================
-        // ON-DEVICE AI COLLABORATOR SYSTEM (WebLLM Dynamic Import)
+        // ON-DEVICE AI COLLABORATOR SYSTEM (Dynamic)
         // ============================================================================
         const AI_MODEL_ID = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC"; 
-        
         let aiEngine = null;
         let isAILoading = false;
         const aiStatusEl = document.getElementById('ai-inline-status');
@@ -404,18 +406,15 @@
             aiStatusEl.className = 'ai-inline-status loading';
 
             try {
-                // Dynamically import WebLLM so it doesn't block the UI from rendering!
                 const { CreateMLCEngine } = await import("https://esm.run/@mlc-ai/web-llm");
-
                 aiEngine = await CreateMLCEngine(AI_MODEL_ID, {
                     initProgressCallback: (progress) => {
-                        aiStatusEl.textContent = `initializing ${CONFIG.AI_NAME}... ${Math.round(progress.progress * 100)}%`;
+                        aiStatusEl.textContent = `initializing... ${Math.round(progress.progress * 100)}%`;
                     }
                 });
                 aiStatusEl.className = 'ai-inline-status';
                 aiStatusEl.textContent = 'online';
             } catch (err) {
-                console.error("AI Init Error:", err);
                 aiStatusEl.className = 'ai-inline-status error';
                 aiStatusEl.textContent = 'offline (check webgpu)';
                 aiEngine = null;
@@ -423,11 +422,8 @@
                 isAILoading = false;
             }
         }
+        setTimeout(() => { initializeAI(); }, 1000);
 
-        // Delay background AI initialization until the app UI is fully mounted
-        setTimeout(() => { initializeAI(); }, 1500);
-
-        // Helper: Extract all text from the current document to feed as context
         async function getDocumentContext() {
             if (!window.editor) return "";
             const data = await window.editor.save();
@@ -444,24 +440,15 @@
         // CUSTOM EDITOR.JS BLOCKS
         // ============================================================================
 
-        // 1. Scan Tool
         class ScanTool {
             static get toolbox() { return { title: 'Scan Text', icon: ICONS.scan }; }
-            constructor({data, config, readOnly}) {
-                this.config = config; this.readOnly = readOnly;
-                this.data = { text: data.text || '' };
-                this.wrapper = createEl('div', 'scan-wrapper');
-            }
+            constructor({data, config, readOnly}) { this.config = config; this.readOnly = readOnly; this.data = { text: data.text || '' }; this.wrapper = createEl('div', 'scan-wrapper'); }
             render() {
                 this.wrapper.innerHTML = '';
                 if (this.data.text) {
                     this.input = createEl('textarea', 'scan-output-textarea', { value: this.data.text });
-                    if (this.readOnly) {
-                        this.input.readOnly = true; this.input.style.background = 'transparent';
-                        this.wrapper.style.border = 'none'; this.wrapper.style.borderLeft = '4px solid var(--border-color)'; this.wrapper.style.borderRadius = '0';
-                    } else {
-                        this.input.addEventListener('input', (e) => { this.data.text = e.target.value; this.adjustHeight(); if(this.config.onChange) this.config.onChange(); });
-                    }
+                    if (this.readOnly) { this.input.readOnly = true; this.input.style.background = 'transparent'; this.wrapper.style.border = 'none'; this.wrapper.style.borderLeft = '4px solid var(--border-color)'; this.wrapper.style.borderRadius = '0'; } 
+                    else { this.input.addEventListener('input', (e) => { this.data.text = e.target.value; this.adjustHeight(); if(this.config.onChange) this.config.onChange(); }); }
                     this.wrapper.appendChild(this.input); setTimeout(() => this.adjustHeight(), 0);
                 } else if (!this.readOnly) {
                     this.actionArea = createEl('div', 'scan-action-area');
@@ -483,127 +470,143 @@
                 this.status.textContent = 'INITIALIZING OCR...';
                 try {
                     if (typeof Tesseract === 'undefined') {
-                        await new Promise((resolve, reject) => {
-                            const script = document.createElement('script'); script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-                            script.onload = resolve; script.onerror = reject; document.head.appendChild(script);
-                        });
+                        await new Promise((resolve, reject) => { const script = document.createElement('script'); script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'; script.onload = resolve; script.onerror = reject; document.head.appendChild(script); });
                     }
                     const worker = await Tesseract.createWorker('eng', 1, { logger: m => { if(m.status === 'recognizing text') this.status.textContent = `ANALYZING: ${Math.round(m.progress * 100)}%`; } });
                     const { data: { text } } = await worker.recognize(file);
                     await worker.terminate();
                     this.data.text = text.trim(); this.render(); if(this.config.onChange) this.config.onChange();
-                } catch(e) {
-                    this.status.textContent = 'SCAN FAILED. TRY AGAIN.';
-                    this.actionArea.onclick = () => this.fileInput.click(); this.actionArea.style.cursor = 'pointer';
-                }
+                } catch(e) { this.status.textContent = 'SCAN FAILED. TRY AGAIN.'; this.actionArea.onclick = () => this.fileInput.click(); this.actionArea.style.cursor = 'pointer'; }
             }
             save() { return this.data; }
         }
 
-        // 2. Compute Tool
         class ComputeTool {
             static get toolbox() { return { title: 'Compute Logic', icon: ICONS.compute }; }
-            constructor({data, config, readOnly}) {
-                this.config = config; this.readOnly = readOnly;
-                this.data = { code: data.code || '', output: data.output || '' };
-                this.wrapper = createEl('div', 'compute-tool-container');
-            }
+            constructor({data, config, readOnly}) { this.config = config; this.readOnly = readOnly; this.data = { code: data.code || '', output: data.output || '' }; this.wrapper = createEl('div', 'compute-tool-container'); }
             render() {
                 this.wrapper.innerHTML = '';
-                this.input = createEl('textarea', 'compute-input', { placeholder: 'Type logic: 10 * 4...', value: this.data.code });
+                this.input = createEl('textarea', 'compute-input', { placeholder: 'Type logic: 10 * 4 or groceries / 2...', value: this.data.code });
                 if (this.readOnly) this.input.readOnly = true;
                 this.output = createEl('div', 'compute-output', { innerHTML: this.data.output });
                 const adjustHeight = () => { this.input.style.height = 'auto'; this.input.style.height = (this.input.scrollHeight) + 'px'; };
                 setTimeout(adjustHeight, 0);
 
                 let evalTimeout;
-                this.input.addEventListener('input', (e) => {
-                    adjustHeight(); this.data.code = e.target.value; clearTimeout(evalTimeout);
-                    evalTimeout = setTimeout(() => this.evaluateLogic(), 400); 
-                });
+                this.input.addEventListener('input', (e) => { adjustHeight(); this.data.code = e.target.value; clearTimeout(evalTimeout); evalTimeout = setTimeout(() => this.evaluateLogic(), 400); });
                 this.wrapper.append(this.input, this.output); return this.wrapper;
             }
             async evaluateLogic() {
                 if (!this.data.code.trim()) { this.output.innerHTML = ''; this.data.output = ''; if(this.config.onChange) this.config.onChange(); return; }
-                const allowed = { Math, Date, Number, String, Array };
-                const ctx = new Proxy({}, { has: () => true, get: (target, prop) => { if (prop === Symbol.unscopables) return undefined; if (prop in allowed) return allowed[prop]; return undefined; } });
+                const find = (query) => {
+                    let results = []; const q = query.toLowerCase();
+                    Object.values(appDB.cache).forEach(day => {
+                        if (!day.blocks) return;
+                        day.blocks.forEach(b => {
+                            if (b.type === 'compute' || b.type === 'recall') return; 
+                            let text = JSON.stringify(b.data).toLowerCase();
+                            if (text.includes(q)) {
+                                if (b.data.text) results.push(b.data.text.replace(/<[^>]*>?/gm, ''));
+                                else if (b.data.items) results.push(...b.data.items.map(i=>i.content.replace(/<[^>]*>?/gm, '')));
+                                else if (b.data.title) results.push(b.data.title);
+                            }
+                        });
+                    });
+                    return results;
+                };
+                const nums = (query) => { let texts = find(query); let numbers = []; texts.forEach(t => { let matches = t.match(/-?\d+(\.\d+)?/g); if (matches) numbers.push(...matches.map(Number)); }); return numbers; };
+                const sum = (query) => nums(query).reduce((a,b)=>a+b, 0);
+                const avg = (query) => { let n = nums(query); return n.length ? sum(query)/n.length : 0; };
+                const allowed = { Math, Date, Number, String, Array, sum, avg, nums, find };
+                const ctx = new Proxy({}, { has: () => true, get: (target, prop) => { if (prop === Symbol.unscopables) return undefined; if (prop in allowed) return allowed[prop]; if (typeof prop === 'string') return sum(prop.toLowerCase()); return undefined; } });
+
                 try {
                     let codeText = this.data.code; const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
                     const fn = new AsyncFunction('ctx', `with (ctx) { return eval(${JSON.stringify(codeText)}); }`);
                     const result = await fn(ctx);
                     if (result === undefined || result === null || Number.isNaN(result)) { this.output.innerHTML = ''; this.data.output = ''; } 
-                    else { this.data.output = typeof result === 'object' ? JSON.stringify(result) : String(result); this.output.innerHTML = this.data.output; this.output.classList.remove('compute-error'); }
+                    else if (Array.isArray(result) && result.length >= 2 && result.every(n => typeof n === 'number')) {
+                        const min = Math.min(...result); const max = Math.max(...result); const range = (max - min) || 1;
+                        const points = result.map((val, i) => `${(i / (result.length - 1)) * 100},${40 - ((val - min) / range) * 40}`).join(' ');
+                        this.data.output = `<div style="font-size: 11px; color: var(--muted-text); margin-bottom: 4px;">Array: [${result.join(', ')}]</div><svg viewBox="0 -5 100 50" style="width: 100%; height: 60px; overflow: visible;" preserveAspectRatio="none"><polyline fill="none" stroke="var(--text-color)" stroke-width="2" points="${points}"></polyline></svg>`;
+                        this.output.innerHTML = this.data.output; this.output.classList.remove('compute-error');
+                    } else { this.data.output = typeof result === 'object' ? JSON.stringify(result) : String(result); this.output.innerHTML = this.data.output; this.output.classList.remove('compute-error'); }
                 } catch(e) { this.data.output = `<span class="compute-error">${e.message}</span>`; this.output.innerHTML = this.data.output; }
                 if(this.config.onChange) this.config.onChange();
             }
             save() { return this.data; }
         }
 
-        // 3. AI Stream Tool
+        // --- SEAMLESS AI STREAM BLOCK ---
         class AIStreamBlock {
-            constructor({data, config, api}) {
-                this.api = api; this.config = config; this.prompt = data.prompt || ""; this.fullMarkdown = "";
-                this.wrapper = createEl('div', 'ai-stream-wrapper');
-            }
+            constructor({data, config, api}) { this.api = api; this.config = config; this.prompt = data.prompt || ""; this.fullMarkdown = ""; this.wrapper = createEl('div', 'ai-stream-wrapper'); }
             render() {
-                const displayName = CONFIG.AI_NAME.charAt(0).toUpperCase() + CONFIG.AI_NAME.slice(1);
-                const header = createEl('div', 'ai-stream-header', { innerHTML: `${ICONS.ai} ${displayName} Collaborator` });
-                const promptEl = createEl('div', 'ai-stream-prompt', { textContent: this.prompt });
+                // Completely stripped out the heavy UI/Header - Just acts as a seamless text stream
                 this.contentEl = createEl('div', 'ai-stream-content');
                 this.cursor = createEl('span', 'ai-cursor');
                 this.contentEl.appendChild(this.cursor);
-                this.wrapper.append(header, promptEl, this.contentEl);
+                this.wrapper.appendChild(this.contentEl);
                 setTimeout(() => this.generateResponse(), 50);
                 return this.wrapper;
             }
             async generateResponse() {
-                if (!aiEngine) { this.contentEl.textContent = "AI Engine is currently loading or unavailable."; return; }
+                if (!aiEngine) { this.contentEl.textContent = "AI Engine is offline."; return; }
                 const docContext = await getDocumentContext();
+                const systemPrompt = `You are ${CONFIG.AI_NAME}. ${CONFIG.AI_PERSONALITY}\nContext:\n${docContext}\nInstructions:\n- Output entirely in markdown.\n- Use checklists by writing '- [ ] task'\n- Use lists by writing '- task' or '1. task'\n- Do math logic by wrapping exactly like this: [COMPUTE] 10 * 4 [/COMPUTE].`;
                 
-                // Inject the user's configured personality
-                const systemPrompt = `You are ${CONFIG.AI_NAME}. ${CONFIG.AI_PERSONALITY}\nYou are integrated directly into a user's markdown-based document. Context:\n${docContext}\nInstructions:\n- Format response in Markdown.\n- Use lists (- or 1.) and headers (##).\n- Wrap math exactly like this: [COMPUTE] 10 * 4 [/COMPUTE].`;
-                
-                const messages = [{ role: "system", content: systemPrompt }, { role: "user", content: this.prompt }];
-
                 try {
-                    const chunks = await aiEngine.chat.completions.create({ messages, stream: true });
+                    const chunks = await aiEngine.chat.completions.create({ messages: [{ role: "system", content: systemPrompt }, { role: "user", content: this.prompt }], stream: true });
                     this.contentEl.innerHTML = ''; 
                     for await (const chunk of chunks) {
                         const text = chunk.choices[0]?.delta?.content || "";
                         this.fullMarkdown += text; this.contentEl.textContent = this.fullMarkdown; this.contentEl.appendChild(this.cursor);
                     }
                     this.cursor.remove(); this.replaceWithParsedBlocks();
-                } catch (e) {
-                    console.error(e); this.contentEl.textContent = "Error generating response: " + e.message; this.cursor.remove();
-                }
+                } catch (e) { this.contentEl.textContent = "Error: " + e.message; this.cursor.remove(); }
             }
+            
+            // Re-engineered parsing logic to handle all EditorJS block types robustly
             replaceWithParsedBlocks() {
                 const blocksToInsert = [];
                 const rawSections = this.fullMarkdown.split(/(?=\[COMPUTE\])|(?<=\[\/COMPUTE\])|\n\n/);
-                let currentList = null;
 
                 rawSections.forEach(section => {
                     const trimmed = section.trim(); if (!trimmed) return;
+
                     if (trimmed.startsWith('[COMPUTE]') && trimmed.endsWith('[/COMPUTE]')) {
-                        if (currentList) { blocksToInsert.push(currentList); currentList = null; }
-                        const code = trimmed.replace('[COMPUTE]', '').replace('[/COMPUTE]', '').trim();
-                        blocksToInsert.push({ type: 'compute', data: { code: code } }); return;
-                    }
-                    const headerMatch = trimmed.match(/^(#{1,3})\s+(.*)/);
-                    if (headerMatch) {
-                        if (currentList) { blocksToInsert.push(currentList); currentList = null; }
-                        blocksToInsert.push({ type: 'header', data: { text: headerMatch[2], level: headerMatch[1].length } }); return;
-                    }
-                    if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || /^\d+\.\s/.test(trimmed)) {
-                        const items = trimmed.split('\n').map(line => { return { content: line.replace(/^[-*]\s|^\d+\.\s/, '').trim() }; }).filter(i => i.content);
-                        if (currentList) { currentList.data.items.push(...items); } else { currentList = { type: 'list', data: { style: trimmed.match(/^\d/) ? 'ordered' : 'unordered', items: items } }; }
+                        blocksToInsert.push({ type: 'compute', data: { code: trimmed.replace('[COMPUTE]', '').replace('[/COMPUTE]', '').trim() } });
                         return;
                     }
-                    if (currentList) { blocksToInsert.push(currentList); currentList = null; }
+
+                    const headerMatch = trimmed.match(/^(#{1,6})\s+(.*)/);
+                    if (headerMatch) {
+                        blocksToInsert.push({ type: 'header', data: { text: headerMatch[2], level: Math.min(headerMatch[1].length, 3) } });
+                        return;
+                    }
+
+                    // Native Checklist Support
+                    if (trimmed.match(/^-\s*\[[ xX]\]/)) {
+                        const items = trimmed.split('\n').filter(l => l.trim()).map(line => {
+                            const checked = line.includes('[x]') || line.includes('[X]');
+                            return { text: line.replace(/^-\s*\[[ xX]\]\s*/, '').trim(), checked: checked };
+                        });
+                        blocksToInsert.push({ type: 'checklist', data: { items: items } });
+                        return;
+                    }
+
+                    // Native List Support
+                    if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || /^\d+\.\s/.test(trimmed)) {
+                        const isOrdered = /^\d+\.\s/.test(trimmed);
+                        const items = trimmed.split('\n').filter(l => l.trim()).map(line => {
+                            return { content: line.replace(/^[-*]\s|^\d+\.\s/, '').trim() };
+                        });
+                        blocksToInsert.push({ type: 'list', data: { style: isOrdered ? 'ordered' : 'unordered', items: items } });
+                        return;
+                    }
+
                     blocksToInsert.push({ type: 'paragraph', data: { text: trimmed.replace(/\n/g, '<br>') } });
                 });
 
-                if (currentList) blocksToInsert.push(currentList);
                 const currentIndex = this.api.blocks.getCurrentBlockIndex();
                 this.api.blocks.delete(currentIndex);
                 blocksToInsert.forEach((block, idx) => { this.api.blocks.insert(block.type, block.data, {}, currentIndex + idx, true); });
@@ -612,19 +615,12 @@
             save() { return { prompt: this.prompt, markdown: this.fullMarkdown }; }
         }
 
-        // 4. Recall Tool
         class RecallTool {
             static get toolbox() { return { title: 'Recall', icon: ICONS.recall }; }
-            constructor({data, config, api, readOnly}) {
-                this.api = api; this.config = config; this.readOnly = readOnly;
-                this.data = data && data.recalled ? data : { recalled: false, sourceDate: null, sourceTime: null, sourceBlock: null };
-                this.wrapper = createEl('div');
-            }
+            constructor({data, config, api, readOnly}) { this.api = api; this.config = config; this.readOnly = readOnly; this.data = data && data.recalled ? data : { recalled: false, sourceDate: null, sourceTime: null, sourceBlock: null }; this.wrapper = createEl('div'); }
             render() {
                 this.wrapper.innerHTML = '';
-                if (this.data.recalled) { this.wrapper.appendChild(this.renderRecalledState()); } 
-                else if (!this.readOnly) { this.wrapper.appendChild(this.renderSearchState()); } 
-                else { this.wrapper.innerHTML = '<div style="color: var(--muted-text); font-size: 13px;">Empty Recall Block</div>'; }
+                if (this.data.recalled) { this.wrapper.appendChild(this.renderRecalledState()); } else if (!this.readOnly) { this.wrapper.appendChild(this.renderSearchState()); } else { this.wrapper.innerHTML = '<div style="color: var(--muted-text); font-size: 13px;">Empty Recall Block</div>'; }
                 return this.wrapper;
             }
             renderSearchState() {
@@ -646,6 +642,9 @@
                             if (block.data.text) searchableText += block.data.text.toLowerCase() + " ";
                             if (block.data.title) searchableText += block.data.title.toLowerCase() + " ";
                             if (block.data.items) searchableText += block.data.items.map(i => i.content || i.text).join(' ').toLowerCase() + " ";
+                            if (block.type === 'smartCanvas') searchableText += "canvas drawing map sketch photo image ";
+                            if (block.type === 'voice') searchableText += "voice audio memo recording mic ";
+                            if (block.type === 'calendar') searchableText += "calendar event date reminder schedule ";
                             if (searchableText.includes(query)) { results.push({ date: dateStr, block: block, timestamp: dayData.timestamps?.[block.id] }); }
                         });
                     });
@@ -654,27 +653,39 @@
                         results.forEach(res => {
                             const item = createEl('div', 'recall-result-item');
                             const dateObj = new Date(res.date + 'T00:00:00'); const displayDate = dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
-                            let snippet = res.block.data.text ? res.block.data.text.replace(/<[^>]*>?/gm, '') : "📄 " + res.block.type.toUpperCase();
+                            let snippet = "";
+                            if (res.block.type === 'paragraph' || res.block.type === 'header' || res.block.type === 'scan') { snippet = res.block.data.text.replace(/<[^>]*>?/gm, ''); } 
+                            else if (res.block.type === 'calendar') { snippet = "📅 " + (res.block.data.title || "Calendar Event"); } 
+                            else if (res.block.type === 'voice') { snippet = "🎤 " + (res.block.data.title || "Voice Memo"); } 
+                            else if (res.block.type === 'smartCanvas') { snippet = "🖌️ " + (res.block.data.title || "Media Canvas"); } 
+                            else if (res.block.type === 'list' || res.block.type === 'checklist') { let items = res.block.data.items || []; snippet = "📝 " + items.map(i=>i.content || i.text || '').join(', ').replace(/<[^>]*>?/gm, ''); } 
+                            else { snippet = "📄 " + res.block.type.toUpperCase() + " Block"; }
                             snippet = snippet.substring(0, 60) + (snippet.length > 60 ? '...' : '');
-                            item.appendChild(createEl('div', 'recall-result-meta', {textContent: displayDate}));
+                            item.appendChild(createEl('div', 'recall-result-meta', {textContent: `${displayDate}`}));
                             item.appendChild(createEl('div', 'recall-result-snippet', {textContent: snippet}));
                             item.onclick = () => { this.data = { recalled: true, sourceDate: res.date, sourceTime: res.timestamp, sourceBlock: res.block }; this.render(); this.config.onChange(); };
                             dropdown.appendChild(item);
-                        }); dropdown.classList.add('active');
-                    } else { dropdown.appendChild(createEl('div', 'recall-result-item', {textContent: 'No matches found'})); dropdown.classList.add('active'); }
+                        });
+                        dropdown.classList.add('active');
+                    } else { dropdown.appendChild(createEl('div', 'recall-result-item', {textContent: 'No matches found', style: 'color: var(--muted-text); cursor: default;'})); dropdown.classList.add('active'); }
                 });
                 document.addEventListener('click', (e) => { if (!searchWrapper.contains(e.target)) dropdown.classList.remove('active'); });
                 searchWrapper.append(icon, input, dropdown); setTimeout(() => input.focus(), 50); return searchWrapper;
             }
             renderRecalledState() {
                 const container = createEl('div', 'recalled-block');
+                const dateObj = new Date(this.data.sourceDate + 'T00:00:00');
+                const displayDate = dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
                 const meta = createEl('div', 'recalled-orig-meta');
-                meta.appendChild(createEl('div', '', {innerHTML: ICONS.recall})); meta.appendChild(createEl('span', '', {textContent: `Recalled`})); container.appendChild(meta);
+                meta.appendChild(createEl('div', '', {innerHTML: ICONS.recall})); meta.appendChild(createEl('span', '', {textContent: `Recalled from ${displayDate}`})); container.appendChild(meta);
+
                 const targetDef = window.EDITOR_TOOLS_CONFIG[this.data.sourceBlock.type];
                 if (targetDef) {
                     try {
                         const instance = new targetDef.class({ data: this.data.sourceBlock.data, readOnly: true, api: this.api, config: targetDef.config || {} });
-                        const renderedNode = instance.render(); renderedNode.style.pointerEvents = 'none'; container.appendChild(renderedNode);
+                        const renderedNode = instance.render();
+                        renderedNode.style.pointerEvents = this.data.sourceBlock.type === 'voice' ? 'auto' : 'none'; 
+                        container.appendChild(renderedNode);
                     } catch (e) { container.appendChild(createEl('div', '', {textContent: 'Error rendering block.'})); }
                 }
                 return container;
@@ -682,22 +693,25 @@
             save() { return this.data; }
         }
 
-        // 5. Smart Canvas Tool
         class SmartCanvasTool {
             static get toolbox() { return { title: 'Media Canvas', icon: ICONS.pen }; }
             constructor({data, config, api, readOnly}) {
                 this.api = api; this.config = config; this.readOnly = readOnly;
-                this.data = { mode: data.mode || null, title: data.title || '', lat: data.lat || 51.505, lng: data.lng || -0.09, zoom: data.zoom || 13, isLocked: data.isLocked || false, baseImage: data.baseImage || null, lines: data.lines || [] };
+                this.data = { mode: data.mode || null, title: data.title || '', lat: data.lat || 51.505, lng: data.lng || -0.09, zoom: data.zoom || 13, isLocked: data.isLocked || false, baseImage: data.baseImage || null, imgWidth: data.imgWidth || null, imgHeight: data.imgHeight || null, hasInitializedView: data.hasInitializedView || false, lines: data.lines || [], isDrawingActive: data.isDrawingActive || false };
                 this.wrapper = createEl('div'); this.relativeFrame = createEl('div', 'canvas-relative-frame'); this.controls = createEl('div', 'block-controls-stack');
+                this.currentColor = '#EF4444'; this.lineLayers = []; this.currentPolyline = null; this.currentPoints = [];
             }
             render() {
                 this.wrapper.innerHTML = ''; 
-                if (!this.data.mode) { if (this.readOnly) this.wrapper.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--muted-text); font-size: 14px;">Blank Canvas</div>'; else this.renderSelector(); } 
-                else {
+                if (!this.data.mode) {
+                    if (this.readOnly) this.wrapper.innerHTML = '<div style="padding: 24px; text-align: center; color: var(--muted-text); font-size: 14px;">Blank Canvas</div>';
+                    else this.renderSelector();
+                } else {
                     this.titleInput = createEl('input', 'tool-title-input', { type: 'text', value: this.data.title, placeholder: 'Name this canvas...' });
                     if (this.readOnly) this.titleInput.readOnly = true;
                     this.titleInput.addEventListener('input', (e) => { this.data.title = e.target.value; if(this.config.onChange) this.config.onChange(); });
                     this.wrapper.appendChild(this.titleInput);
+
                     this.renderUniversalCanvas();
                     if (!this.readOnly) { this.buildControls(); this.relativeFrame.appendChild(this.controls); }
                     this.wrapper.appendChild(this.relativeFrame);
@@ -707,15 +721,45 @@
             renderSelector() {
                 const selector = createEl('div', 'smart-canvas-selector');
                 const mapBtn = createEl('button', 'smart-canvas-option', {}, [createEl('div', '', {innerHTML: ICONS.map}), createEl('span', '', {textContent: 'Map View'})]);
+                const photoBtn = createEl('button', 'smart-canvas-option', {}, [createEl('div', '', {innerHTML: ICONS.image}), createEl('span', '', {textContent: 'Photo Overlay'})]);
                 const blankBtn = createEl('button', 'smart-canvas-option', {}, [createEl('div', '', {innerHTML: ICONS.canvas}), createEl('span', '', {textContent: 'Blank Canvas'})]);
-                mapBtn.onclick = () => { this.data.mode = 'map'; this.render(); if(this.config.onChange) this.config.onChange(); };
-                blankBtn.onclick = () => { this.data.mode = 'blank'; this.render(); if(this.config.onChange) this.config.onChange(); };
-                selector.append(mapBtn, blankBtn); this.wrapper.appendChild(selector);
+                const fileInput = createEl('input', '', { type: 'file', accept: 'image/*', style: 'display: none;' });
+                
+                mapBtn.onclick = () => { this.data.mode = 'map'; this.data.isLocked = false; this.data.isDrawingActive = false; this.render(); if(this.config.onChange) this.config.onChange(); };
+                blankBtn.onclick = () => { this.data.mode = 'blank'; this.data.isLocked = false; this.data.isDrawingActive = false; this.render(); if(this.config.onChange) this.config.onChange(); };
+                photoBtn.onclick = () => fileInput.click();
+                fileInput.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (re) => { 
+                            const img = new Image();
+                            img.onload = () => { this.data.baseImage = re.target.result; this.data.imgWidth = img.width; this.data.imgHeight = img.height; this.data.mode = 'image'; this.data.isLocked = false; this.data.isDrawingActive = false; this.render(); if(this.config.onChange) this.config.onChange(); };
+                            img.src = re.target.result;
+                        }; reader.readAsDataURL(file);
+                    }
+                };
+                selector.append(mapBtn, photoBtn, blankBtn, fileInput); this.wrapper.appendChild(selector);
             }
             buildControls() {
                 this.lockBtn = createEl('button', 'canvas-action-btn', { innerHTML: this.data.isLocked ? ICONS.lock : ICONS.unlock });
                 this.lockBtn.onclick = () => { this.data.isLocked = !this.data.isLocked; this.updateInteractions(); if(this.config.onChange) this.config.onChange(); };
-                this.controls.append(this.lockBtn);
+                this.colorPicker = createEl('input', '', { type: 'color', value: this.currentColor, style: 'position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;' });
+                this.colorPicker.addEventListener('input', (e) => { this.currentColor = e.target.value; });
+                this.drawBtn = createEl('button', `canvas-action-btn draw-btn ${this.data.isDrawingActive ? 'active' : ''}`, { innerHTML: ICONS.pen });
+                this.drawBtn.addEventListener('dblclick', (e) => { e.preventDefault(); e.stopPropagation(); this.colorPicker.click(); });
+                this.drawBtn.addEventListener('click', (e) => {
+                    e.preventDefault(); e.stopPropagation(); if (this.wasLongPress) { this.wasLongPress = false; return; }
+                    this.data.isDrawingActive = !this.data.isDrawingActive; this.drawBtn.classList.toggle('active', this.data.isDrawingActive); this.updateInteractions(); if(this.config.onChange) this.config.onChange();
+                });
+                const startPress = (e) => {
+                    if (e.type === 'touchstart') e.stopPropagation(); this.wasLongPress = false;
+                    this.pressTimer = setTimeout(() => { this.wasLongPress = true; this.clearDrawing(); this.drawBtn.style.transform = 'scale(0.8)'; setTimeout(() => this.drawBtn.style.transform = '', 150); }, 600);
+                };
+                const cancelPress = () => clearTimeout(this.pressTimer);
+                ['mousedown','touchstart'].forEach(evt => this.drawBtn.addEventListener(evt, startPress, {passive: true}));
+                ['mouseup','mouseleave','touchend','touchcancel'].forEach(evt => this.drawBtn.addEventListener(evt, cancelPress));
+                this.controls.append(this.lockBtn, this.drawBtn, this.colorPicker);
             }
             renderUniversalCanvas() {
                 if (this.map) { this.map.remove(); this.map = null; }
@@ -723,60 +767,117 @@
                 setTimeout(() => {
                     if (!this.mediaContainer.isConnected) return;
                     if (this.data.mode === 'map') {
-                        this.map = L.map(this.mediaContainer, { zoomControl: false }).setView([this.data.lat, this.data.lng], this.data.zoom);
-                        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(this.map);
+                        this.map = L.map(this.mediaContainer, { zoomControl: false, attributionControl: false }).setView([this.data.lat, this.data.lng], this.data.zoom);
+                        const tileUrl = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+                        L.tileLayer(tileUrl, { maxZoom: 20 }).addTo(this.map);
                     } else {
-                        this.map = L.map(this.mediaContainer, { crs: L.CRS.Simple, zoomControl: false, minZoom: -4 }).setView([0, 0], 0);
+                        this.map = L.map(this.mediaContainer, { crs: L.CRS.Simple, zoomControl: false, attributionControl: false, minZoom: -4 });
+                        if (this.data.mode === 'image' && this.data.baseImage) {
+                            const bounds = [[0, 0], [this.data.imgHeight || 600, this.data.imgWidth || 800]];
+                            L.imageOverlay(this.data.baseImage, bounds).addTo(this.map);
+                            if (!this.data.hasInitializedView && !this.readOnly) { this.map.fitBounds(bounds); this.data.hasInitializedView = true; if(this.config.onChange) this.config.onChange(); } 
+                            else { this.map.setView([this.data.lat, this.data.lng], this.data.zoom); }
+                        } else { this.map.setView([this.data.lat || 0, this.data.lng || 0], this.data.zoom || 0); }
                     }
-                    this.updateInteractions();
+                    this.renderExistingLines(); this.initDrawingTracker(); this.updateInteractions();
                     this.map.on('moveend', () => { if(this.config.onChange) this.config.onChange(); });
                 }, 150);
             }
+            renderExistingLines() {
+                this.lineLayers.forEach(layer => this.map.removeLayer(layer)); this.lineLayers = [];
+                this.data.lines.forEach(line => { this.lineLayers.push(L.polyline(line.points, { color: line.color, weight: line.weight, lineCap: 'round', lineJoin: 'round', smoothFactor: 1.5 }).addTo(this.map)); });
+            }
+            initDrawingTracker() {
+                if (this.readOnly) return; let isPointerDown = false;
+                this.mediaContainer.addEventListener('pointerdown', (e) => {
+                    if (!this.data.isDrawingActive) return; isPointerDown = true; this.mediaContainer.setPointerCapture(e.pointerId);
+                    this.currentPoints = [this.map.mouseEventToLatLng(e)];
+                    this.currentPolyline = L.polyline(this.currentPoints, { color: this.currentColor, weight: 4, lineCap: 'round', lineJoin: 'round', smoothFactor: 1.5 }).addTo(this.map);
+                });
+                this.mediaContainer.addEventListener('pointermove', (e) => {
+                    if (!this.data.isDrawingActive || !isPointerDown || !this.currentPolyline) return;
+                    this.currentPoints.push(this.map.mouseEventToLatLng(e)); this.currentPolyline.setLatLngs(this.currentPoints);
+                });
+                const endDraw = () => {
+                    if (!isPointerDown) return; isPointerDown = false; if (!this.currentPolyline || !this.data.isDrawingActive) return;
+                    this.data.lines.push({ color: this.currentColor, weight: 4, points: this.currentPoints.map(p => [p.lat, p.lng]) });
+                    this.lineLayers.push(this.currentPolyline); this.currentPolyline = null; this.currentPoints = []; if(this.config.onChange) this.config.onChange();
+                };
+                this.mediaContainer.addEventListener('pointerup', endDraw); this.mediaContainer.addEventListener('pointercancel', endDraw);
+            }
+            clearDrawing() { this.lineLayers.forEach(layer => { if(this.map) this.map.removeLayer(layer); }); this.lineLayers = []; this.data.lines = []; if(this.config.onChange) this.config.onChange(); }
             updateInteractions() {
-                if (!this.map) return; this.mediaContainer.classList.remove('locked-mode');
-                if (this.readOnly || this.data.isLocked) { 
-                    this.map.dragging.disable(); this.map.touchZoom.disable(); this.map.scrollWheelZoom.disable(); this.mediaContainer.classList.add('locked-mode'); 
-                    if(this.lockBtn) this.lockBtn.innerHTML = ICONS.lock;
-                } else { 
-                    this.map.dragging.enable(); this.map.touchZoom.enable(); this.map.scrollWheelZoom.enable(); 
-                    if(this.lockBtn) this.lockBtn.innerHTML = ICONS.unlock;
+                if (!this.map) return; this.mediaContainer.classList.remove('drawing-mode', 'locked-mode');
+                const disableAll = () => { this.map.dragging.disable(); this.map.touchZoom.disable(); this.map.doubleClickZoom.disable(); this.map.scrollWheelZoom.disable(); this.map.boxZoom.disable(); this.map.keyboard.disable(); if (this.map.tap) this.map.tap.disable(); };
+                const enableAll = () => { this.map.dragging.enable(); this.map.touchZoom.enable(); this.map.doubleClickZoom.enable(); this.map.scrollWheelZoom.enable(); this.map.boxZoom.enable(); this.map.keyboard.enable(); if (this.map.tap) this.map.tap.enable(); };
+
+                if (this.readOnly) { disableAll(); this.mediaContainer.classList.add('locked-mode'); if(this.lockBtn) this.lockBtn.style.display = 'none'; if(this.drawBtn) this.drawBtn.style.display = 'none'; return; }
+                if (!this.data.isLocked) {
+                    this.data.isDrawingActive = false; enableAll();
+                    if (this.lockBtn) this.lockBtn.innerHTML = ICONS.unlock;
+                    if (this.drawBtn) { this.drawBtn.style.display = 'none'; this.drawBtn.classList.remove('active'); }
+                } else {
+                    disableAll(); this.mediaContainer.classList.add('locked-mode');
+                    if (this.lockBtn) this.lockBtn.innerHTML = ICONS.lock;
+                    if (this.drawBtn) { this.drawBtn.style.display = 'flex'; if (this.data.isDrawingActive) { this.drawBtn.classList.add('active'); this.mediaContainer.classList.add('drawing-mode'); } else { this.drawBtn.classList.remove('active'); } }
                 }
             }
             save() { if (this.map && this.data.mode) { const center = this.map.getCenter(); this.data.lat = center.lat; this.data.lng = center.lng; this.data.zoom = this.map.getZoom(); } return this.data; }
+            destroy() { if (this.map) { this.map.remove(); this.map = null; } }
         }
 
-        // 6. Calendar Tool
         class CalendarTool {
             static get toolbox() { return { title: 'Calendar Event', icon: ICONS.calendar }; }
             constructor({data, config, api, readOnly}) {
                 this.id = crypto.randomUUID(); this.config = config; this.readOnly = readOnly;
-                this.data = { title: data.title || '', datetime: data.datetime || new Date().toISOString() };
+                this.data = { title: data.title || '', datetime: data.datetime || new Date().toISOString(), notified: data.notified || false };
+                if (!this.data.notified && !this.readOnly && new Date(this.data.datetime) > new Date()) NotificationEngine.schedule(this.id, this.data.datetime, this.data.title);
                 this.wrapper = createEl('div', 'calendar-tool-container'); 
             }
-            formatDisplayDate() { const d = new Date(this.data.datetime); return `${d.toLocaleDateString()} at ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`; }
+            formatDisplayDate() { const d = new Date(this.data.datetime); return `${d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} at ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`; }
             render() {
-                this.titleInput = createEl('input', 'cal-title', { type: 'text', placeholder: 'Event Name...', value: this.data.title });
-                if (this.readOnly) { this.titleInput.readOnly = true; } else { this.titleInput.oninput = (e) => { this.data.title = e.target.value; if(this.config.onChange) this.config.onChange(); }; }
+                this.titleInput = createEl('input', 'cal-title', { type: 'text', placeholder: 'Event Name / Reminder...', value: this.data.title });
+                if (this.readOnly) { this.titleInput.readOnly = true; this.titleInput.style.pointerEvents = 'none'; } 
+                else { this.titleInput.oninput = (e) => { this.data.title = e.target.value; NotificationEngine.schedule(this.id, this.data.datetime, this.data.title); if(this.config.onChange) this.config.onChange(); }; }
+
                 const header = createEl('div', 'cal-header', {}, [createEl('div', '', { innerHTML: ICONS.calendar }), this.titleInput]);
                 this.displayTxt = createEl('span', 'cal-display-text', { textContent: this.formatDisplayDate() });
                 const displayBtn = createEl('button', 'cal-display-btn', {}, [this.displayTxt]);
+                
                 if (!this.readOnly) {
                     displayBtn.appendChild(createEl('div', '', { innerHTML: ICONS.chevronDown }));
-                    displayBtn.onclick = () => { DatePicker.open(new Date(this.data.datetime), (newDate) => { this.data.datetime = newDate.toISOString(); this.displayTxt.textContent = this.formatDisplayDate(); if(this.config.onChange) this.config.onChange(); }, { showTime: true }); };
+                    displayBtn.onclick = () => { DatePicker.open(new Date(this.data.datetime), (newDate) => { this.data.datetime = newDate.toISOString(); this.data.notified = false; this.displayTxt.textContent = this.formatDisplayDate(); NotificationEngine.schedule(this.id, this.data.datetime, this.data.title); if(this.config.onChange) this.config.onChange(); }, { showTime: true, disablePast: true }); };
+                } else { displayBtn.style.cursor = 'default'; displayBtn.style.border = 'none'; displayBtn.style.background = 'transparent'; displayBtn.style.padding = '8px 0'; }
+
+                const exportBtn = createEl('button', 'cal-btn primary', {}, [createEl('div', '', { innerHTML: ICONS.download }), document.createTextNode(' Add to Calendar')]);
+                exportBtn.onclick = () => {
+                    const start = new Date(this.data.datetime); const formatICS = (date) => date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+                    const icsContent = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', `DTSTART:${formatICS(start)}`, `DTEND:${formatICS(new Date(start.getTime() + 3600000))}`, `SUMMARY:${this.data.title || 'Note Event'}`, 'END:VEVENT', 'END:VCALENDAR'].join('\n');
+                    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([icsContent], { type: 'text/calendar;charset=utf-8' })); a.download = `${this.data.title ? this.data.title.replace(/\s+/g, '_') : 'event'}.ics`; a.click();
+                };
+
+                const actionsArr = [exportBtn];
+                if (!this.readOnly) {
+                    const isGranted = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+                    this.notifyBtn = createEl('button', `cal-btn ${isGranted ? 'granted' : ''}`, {}, [createEl('div', '', { innerHTML: ICONS.bell }), document.createTextNode(isGranted ? ' On' : ' Notify')]);
+                    this.notifyBtn.onclick = async () => { if (!('Notification' in window)) return alert('Browser does not support notifications.'); if (await Notification.requestPermission() === 'granted') { this.notifyBtn.innerHTML = ICONS.bell + ' On'; this.notifyBtn.classList.add('granted'); NotificationEngine.schedule(this.id, this.data.datetime, this.data.title); } };
+                    actionsArr.push(this.notifyBtn);
                 }
-                this.wrapper.append(header, displayBtn); return this.wrapper;
+                this.wrapper.append(header, displayBtn, createEl('div', 'cal-actions', {}, actionsArr)); return this.wrapper;
             }
+            destroy() { NotificationEngine.cancel(this.id); }
             save() { return this.data; }
         }
 
-        // 7. Voice Memo Tool
         class VoiceMemo {
             static get toolbox() { return { title: 'Voice Memo', icon: ICONS.mic }; }
             constructor({data, config, api, readOnly}) {
-                this.config = config; this.readOnly = readOnly; this.data = { url: data.url || null, title: data.title || '' };
+                this.api = api; this.config = config; this.readOnly = readOnly; 
+                this.data = { url: data.url || null, title: data.title || '' };
                 this.recorder = null; this.chunks = []; this.isPlaying = false; this.isRecording = false;
-                this.nodes = { wrapper: createEl('div', 'voice-tool-container'), button: createEl('button', 'v-memo__btn'), title: createEl('input', 'v-memo__title', { type: 'text', value: this.data.title, placeholder: 'Name memo...' }), status: createEl('div', 'v-memo__status'), audio: createEl('audio', '', { src: this.data.url || '', style: 'display:none;' }) };
-                if (this.readOnly) this.nodes.title.readOnly = true; else this.nodes.title.oninput = (e) => { this.data.title = e.target.value; if(this.config.onChange) this.config.onChange(); };
+                this.nodes = { wrapper: createEl('div', 'voice-tool-container'), button: createEl('button', 'v-memo__btn'), title: createEl('input', 'v-memo__title', { type: 'text', value: this.data.title, placeholder: 'Name this memo...' }), status: createEl('div', 'v-memo__status'), audio: createEl('audio', '', { style: 'display: none;', src: this.data.url || '' }) };
+                if (this.readOnly) this.nodes.title.readOnly = true;
+                this.nodes.title.addEventListener('input', (e) => { this.data.title = e.target.value; if(this.config.onChange) this.config.onChange(); });
             }
             render() {
                 this.nodes.audio.onplay = () => { this.isPlaying = true; this.updateUI(); }; this.nodes.audio.onpause = () => { this.isPlaying = false; this.updateUI(); }; this.nodes.audio.onended = () => { this.isPlaying = false; this.updateUI(); };
@@ -795,17 +896,18 @@
                 if (this.readOnly && !this.data.url) return;
                 if (this.data.url) { this.isPlaying ? this.nodes.audio.pause() : this.nodes.audio.play(); } 
                 else {
-                    if (this.isRecording) { this.recorder.stop(); this.isRecording = false; } 
+                    if (this.isRecording) { this.recorder.stop(); this.isRecording = false; this.nodes.status.innerText = 'Processing...'; } 
                     else {
                         try {
                             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                             this.recorder = new MediaRecorder(stream); this.chunks = []; this.recorder.ondataavailable = (e) => this.chunks.push(e.data);
                             this.recorder.onstop = () => { const reader = new FileReader(); reader.onloadend = () => { this.data.url = reader.result; this.nodes.audio.src = this.data.url; this.updateUI(); if(this.config.onChange) this.config.onChange(); }; reader.readAsDataURL(new Blob(this.chunks, { type: 'audio/webm' })); stream.getTracks().forEach(track => track.stop()); };
                             this.recorder.start(); this.isRecording = true; this.updateUI();
-                        } catch (err) { this.nodes.status.innerText = 'Mic access denied'; }
+                        } catch (err) { this.nodes.status.innerText = 'Mic denied'; }
                     }
                 }
             }
+            destroy() { if (this.recorder && this.recorder.state !== 'inactive') this.recorder.stop(); if (this.recorder && this.recorder.stream) this.recorder.stream.getTracks().forEach(track => track.stop()); this.nodes.audio.pause(); }
             save() { return this.data; }
         }
 
@@ -837,6 +939,18 @@
             aiStream: { class: AIStreamBlock, config: { onChange: scheduleSave } }
         };
 
+        document.getElementById('date-header').onclick = () => {
+            const [y, m, d] = window.currentDateStr.split('-').map(Number);
+            DatePicker.open(new Date(y, m - 1, d), (selectedDate) => {
+                const selectedStr = getLocalYYYYMMDD(selectedDate);
+                if (window.currentDateStr !== selectedStr) {
+                    window.currentDateStr = selectedStr;
+                    document.getElementById('date-header').innerHTML = getDisplayDate(selectedStr);
+                    initEditor(selectedStr);
+                }
+            }, { showTime: false, disableFuture: true, onlyNotes: true }); 
+        };
+
         const domObserver = new MutationObserver(() => { cancelAnimationFrame(updateRaf); updateRaf = requestAnimationFrame(updateAllTimestamps); });
 
         function updateAllTimestamps() {
@@ -864,7 +978,7 @@
         }
 
         // ============================================================================
-        // THE DYNAMIC AI INTERCEPTOR
+        // SEAMLESS AI INTERCEPTOR
         // ============================================================================
         document.getElementById('editorjs').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -877,36 +991,33 @@
                 const blockEl = activeBlock.holder;
                 const text = blockEl.textContent.replace(/\u00A0/g, ' ').trim(); 
 
-                // Dynamically check against the configured AI name (e.g. "@nova ")
                 const trigger = `@${CONFIG.AI_NAME.toLowerCase()} `;
 
                 if (text.toLowerCase().startsWith(trigger)) {
                     e.preventDefault();
                     e.stopPropagation();
 
-                    // Extract prompt, regardless of casing
                     const prompt = text.substring(trigger.length).trim();
                     if (!prompt) return;
 
                     if (!aiEngine) {
-                        alert(`${CONFIG.AI_NAME} is still booting in the background. Please wait a moment.`);
+                        alert(`${CONFIG.AI_NAME} is still booting. Please wait a moment.`);
                         return;
                     }
 
-                    window.editor.blocks.delete(activeIndex);
+                    // Seamless replacement: Insert the AI stream at the same location, then remove the prompt
                     window.editor.blocks.insert('aiStream', { prompt: prompt }, {}, activeIndex, true);
+                    window.editor.blocks.delete(activeIndex + 1);
                 }
             }
         }, true);
 
-        // --- Init Editor ---
         async function initEditor(date) {
             if (window.editor) { domObserver.disconnect(); await window.editor.destroy(); window.editor = null; }
             
             const isToday = date === todayStr;
             let savedData = appDB.cache[date] || { blocks: [] };
             
-            // Set dynamic placeholder text based on AI Name
             if (isToday && (!savedData.blocks || savedData.blocks.length === 0)) {
                 savedData = {
                     blocks: [
@@ -920,7 +1031,7 @@
 
             window.editor = new EditorJS({
                 holder: 'editorjs',
-                placeholder: isToday ? `Start writing or type @${CONFIG.AI_NAME}...` : 'No notes available for this day.',
+                placeholder: isToday ? `Start typing or call @${CONFIG.AI_NAME}...` : 'No notes available for this day.',
                 readOnly: !isToday,
                 data: savedData,
                 tools: window.EDITOR_TOOLS_CONFIG,
@@ -929,12 +1040,7 @@
             });
         }
 
-        // Instant DB Init handling
-        appDB.init().then(() => {
-            initEditor(window.currentDateStr);
-        }).catch(e => {
-            initEditor(window.currentDateStr);
-        });
+        appDB.init().then(() => { initEditor(window.currentDateStr); });
 
     </script>
 </body>
