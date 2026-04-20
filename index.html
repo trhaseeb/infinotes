@@ -79,10 +79,6 @@
             ::selection { background: var(--border-color) !important; color: var(--text-color); }
         }
 
-        @media (max-width: 650px) {
-            .ce-popover, .ce-settings, .ce-inline-toolbar { bottom: var(--keyboard-offset, 0px) !important; max-height: calc(100vh - var(--keyboard-offset, 0px) - 20px) !important; transition: bottom 0.2s cubic-bezier(0.1, 0.7, 0.1, 1), max-height 0.2s ease; }
-        }
-
         /* --- STYLISH BRUTALIST HEADER & AI SUBTITLE --- */
         #date-header { 
             text-align: left; font-size: clamp(60px, 18vw, 150px); font-weight: 900; 
@@ -91,21 +87,18 @@
             cursor: pointer; transition: opacity 0.2s; user-select: none; white-space: nowrap; 
         }
         #date-header:hover { opacity: 0.7; }
-        #date-header:active { opacity: 0.5; }
         
-        .ai-inline-status {
-            font-family: var(--font-main);
-            font-size: 13px;
-            font-weight: 600;
-            color: #a855f7;
-            margin: 0 0 40px -20px;
-            opacity: 0.8;
-            transition: opacity 0.3s ease;
-            user-select: none;
-            display: inline-block;
-        }
+        .header-status-row { display: flex; align-items: center; margin: 0 0 40px -20px; user-select: none; }
+
+        .ai-inline-status { font-family: var(--font-main); font-size: 13px; font-weight: 600; color: #a855f7; opacity: 0.8; transition: opacity 0.3s ease; text-transform: lowercase; }
         .ai-inline-status.loading { animation: pulse-opacity 2s infinite ease-in-out; }
         .ai-inline-status.error { color: #ef4444; opacity: 1; }
+
+        .save-indicator { font-family: var(--font-main); font-size: 11px; font-weight: 500; color: var(--muted-text); margin-left: 12px; opacity: 0; transition: opacity 0.4s ease; text-transform: lowercase; }
+        .save-indicator.visible { opacity: 1; }
+        
+        .storage-warning { font-family: var(--font-main); font-size: 12px; font-weight: 600; color: #ef4444; margin-left: 12px; display: none; }
+
         @keyframes pulse-opacity { 0%, 100% { opacity: 0.8; } 50% { opacity: 0.3; } }
 
         .ce-block-time { font-size: 11px; color: var(--muted-text); text-align: right; padding-top: 6px; padding-bottom: 2px; padding-right: 2px; user-select: none; opacity: 0.7; font-weight: 500; }
@@ -207,7 +200,11 @@
 
     <div class="app-container">
         <div id="date-header"></div>
-        <div id="ai-inline-status" class="ai-inline-status loading">initializing...</div>
+        <div class="header-status-row">
+            <div id="ai-inline-status" class="ai-inline-status loading">initializing...</div>
+            <span id="save-indicator" class="save-indicator">saved</span>
+            <span id="storage-warning" class="storage-warning">Private Mode: Notes will not be saved</span>
+        </div>
         <div id="editorjs"></div>
     </div>
 
@@ -296,32 +293,74 @@
         function getLocalYYYYMMDD(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 
         // ============================================================================
-        // DATABASE ADAPTER
+        // 💾 ROBUST, ASYNCHRONOUS STORAGE ADAPTER (No main-thread blocking)
         // ============================================================================
         class IndexedDBAdapter {
-            constructor() { this.dbName = 'InfiniteNotesDB'; this.storeName = 'daily_notes'; this.cache = {}; this.isMemoryOnly = false; }
+            constructor() { 
+                this.dbName = 'InfiniteNotesDB'; 
+                this.storeName = 'daily_notes'; 
+                this.cache = {}; 
+                this.isMemoryOnly = false; 
+                this.saveQueue = Promise.resolve(); // Strict queue to prevent race conditions
+            }
+
             init() {
                 return new Promise((resolve) => {
                     try {
                         const req = indexedDB.open(this.dbName, 1);
-                        req.onupgradeneeded = (e) => { e.target.result.createObjectStore(this.storeName); };
-                        req.onsuccess = (e) => { this.db = e.target.result; this.loadAll().then(data => { this.cache = data; resolve(); }); };
-                        req.onerror = () => { this.isMemoryOnly = true; resolve(); };
-                    } catch(e) { this.isMemoryOnly = true; resolve(); }
+                        req.onupgradeneeded = (e) => {
+                            const db = e.target.result;
+                            if (!db.objectStoreNames.contains(this.storeName)) db.createObjectStore(this.storeName);
+                        };
+                        req.onsuccess = (e) => { 
+                            this.db = e.target.result; 
+                            this.loadAll().then(data => { this.cache = data; resolve(); }); 
+                        };
+                        req.onerror = () => { this.enableFallback(resolve); };
+                    } catch(e) { this.enableFallback(resolve); }
                 });
             }
-            save(dateStr, data) { 
-                this.cache[dateStr] = data; 
-                if (this.isMemoryOnly) return;
-                try { const tx = this.db.transaction(this.storeName, 'readwrite'); tx.objectStore(this.storeName).put(data, dateStr); } catch(e) {}
+
+            enableFallback(resolve) {
+                this.isMemoryOnly = true;
+                document.getElementById('storage-warning').style.display = 'block';
+                resolve();
             }
+
+            // All saves are queued asynchronously so they never trample each other or block UI
+            save(dateStr, data) {
+                this.cache[dateStr] = data;
+                if (this.isMemoryOnly || !this.db) return Promise.resolve();
+
+                this.saveQueue = this.saveQueue.then(() => {
+                    return new Promise((resolve, reject) => {
+                        const tx = this.db.transaction(this.storeName, 'readwrite');
+                        const store = tx.objectStore(this.storeName);
+                        const req = store.put(data, dateStr);
+                        req.onsuccess = () => resolve();
+                        req.onerror = () => reject(req.error);
+                    });
+                }).catch(err => console.error("IDB Save Error:", err));
+
+                return this.saveQueue;
+            }
+
             loadAll() {
                 return new Promise(resolve => {
-                    if (this.isMemoryOnly) return resolve({});
+                    if (this.isMemoryOnly || !this.db) return resolve({});
                     try {
-                        const tx = this.db.transaction(this.storeName, 'readonly'); const store = tx.objectStore(this.storeName);
+                        const tx = this.db.transaction(this.storeName, 'readonly');
+                        const store = tx.objectStore(this.storeName);
                         const valReq = store.getAll(); const keyReq = store.getAllKeys();
-                        tx.oncomplete = () => { const result = {}; keyReq.result.forEach((key, i) => result[key] = valReq.result[i]); resolve(result); };
+                        
+                        tx.oncomplete = () => {
+                            const result = {};
+                            if (keyReq.result && valReq.result) {
+                                keyReq.result.forEach((key, i) => result[key] = valReq.result[i]);
+                            }
+                            resolve(result);
+                        };
+                        tx.onerror = () => resolve({});
                     } catch(e) { resolve({}); }
                 });
             }
@@ -329,7 +368,7 @@
         let appDB = new IndexedDBAdapter();
 
         // ============================================================================
-        // DATE PICKER MODAL
+        // GLOBAL UI: DATE PICKER MODAL
         // ============================================================================
         const DatePicker = (function() {
             let activeDate, viewDate, onConfirm, config;
@@ -393,7 +432,7 @@
         })();
 
         // ============================================================================
-        // ON-DEVICE AI COLLABORATOR SYSTEM (Dynamic)
+        // ON-DEVICE AI COLLABORATOR SYSTEM
         // ============================================================================
         const AI_MODEL_ID = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC"; 
         let aiEngine = null;
@@ -406,6 +445,8 @@
             aiStatusEl.className = 'ai-inline-status loading';
 
             try {
+                // Note: CreateMLCEngine inherently spawns WebWorkers in supported browsers, 
+                // protecting the main UI thread during heavy inference.
                 const { CreateMLCEngine } = await import("https://esm.run/@mlc-ai/web-llm");
                 aiEngine = await CreateMLCEngine(AI_MODEL_ID, {
                     initProgressCallback: (progress) => {
@@ -422,7 +463,8 @@
                 isAILoading = false;
             }
         }
-        setTimeout(() => { initializeAI(); }, 1000);
+        // Defer AI load so Editor UI builds instantly
+        setTimeout(() => { initializeAI(); }, 1500);
 
         async function getDocumentContext() {
             if (!window.editor) return "";
@@ -541,7 +583,6 @@
         class AIStreamBlock {
             constructor({data, config, api}) { this.api = api; this.config = config; this.prompt = data.prompt || ""; this.fullMarkdown = ""; this.wrapper = createEl('div', 'ai-stream-wrapper'); }
             render() {
-                // Completely stripped out the heavy UI/Header - Just acts as a seamless text stream
                 this.contentEl = createEl('div', 'ai-stream-content');
                 this.cursor = createEl('span', 'ai-cursor');
                 this.contentEl.appendChild(this.cursor);
@@ -552,7 +593,7 @@
             async generateResponse() {
                 if (!aiEngine) { this.contentEl.textContent = "AI Engine is offline."; return; }
                 const docContext = await getDocumentContext();
-                const systemPrompt = `You are ${CONFIG.AI_NAME}. ${CONFIG.AI_PERSONALITY}\nContext:\n${docContext}\nInstructions:\n- Output entirely in markdown.\n- Use checklists by writing '- [ ] task'\n- Use lists by writing '- task' or '1. task'\n- Do math logic by wrapping exactly like this: [COMPUTE] 10 * 4 [/COMPUTE].`;
+                const systemPrompt = `You are ${CONFIG.AI_NAME}. ${CONFIG.AI_PERSONALITY}\nContext:\n${docContext}\nInstructions:\n- Output entirely in markdown.\n- For Checklists use '- [ ] task'\n- For Lists use '- task' or '1. task'\n- Wrap math exactly like this: [COMPUTE] 10 * 4 [/COMPUTE].`;
                 
                 try {
                     const chunks = await aiEngine.chat.completions.create({ messages: [{ role: "system", content: systemPrompt }, { role: "user", content: this.prompt }], stream: true });
@@ -565,7 +606,6 @@
                 } catch (e) { this.contentEl.textContent = "Error: " + e.message; this.cursor.remove(); }
             }
             
-            // Re-engineered parsing logic to handle all EditorJS block types robustly
             replaceWithParsedBlocks() {
                 const blocksToInsert = [];
                 const rawSections = this.fullMarkdown.split(/(?=\[COMPUTE\])|(?<=\[\/COMPUTE\])|\n\n/);
@@ -584,7 +624,6 @@
                         return;
                     }
 
-                    // Native Checklist Support
                     if (trimmed.match(/^-\s*\[[ xX]\]/)) {
                         const items = trimmed.split('\n').filter(l => l.trim()).map(line => {
                             const checked = line.includes('[x]') || line.includes('[X]');
@@ -594,7 +633,6 @@
                         return;
                     }
 
-                    // Native List Support
                     if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || /^\d+\.\s/.test(trimmed)) {
                         const isOrdered = /^\d+\.\s/.test(trimmed);
                         const items = trimmed.split('\n').filter(l => l.trim()).map(line => {
@@ -610,7 +648,9 @@
                 const currentIndex = this.api.blocks.getCurrentBlockIndex();
                 this.api.blocks.delete(currentIndex);
                 blocksToInsert.forEach((block, idx) => { this.api.blocks.insert(block.type, block.data, {}, currentIndex + idx, true); });
+                
                 if(this.config.onChange) this.config.onChange();
+                scheduleSave(true); // Force queue evaluation
             }
             save() { return { prompt: this.prompt, markdown: this.fullMarkdown }; }
         }
@@ -912,10 +952,11 @@
         }
 
         // ============================================================================
-        // CORE APP INITIALIZATION
+        // CORE APP LIFECYCLE & ASYNC STORAGE QUEUE
         // ============================================================================
         window.editor = null; 
         let timestamps = {}, updateRaf, saveTimeout;
+        let isSaving = false, hasPendingSave = false;
         let todayStr = getLocalYYYYMMDD(new Date());
         window.currentDateStr = todayStr;
 
@@ -930,16 +971,67 @@
             header: { class: Header, inlineToolbar: ['link', 'bold', 'italic'], config: { levels: [1, 2, 3], defaultLevel: 2 } },
             list: { class: NestedList, inlineToolbar: ['link', 'bold', 'italic'] },
             checklist: { class: Checklist, inlineToolbar: ['link', 'bold', 'italic'] },
-            scan: { class: ScanTool, config: { onChange: scheduleSave } },
-            compute: { class: ComputeTool, config: { onChange: scheduleSave } },
-            smartCanvas: { class: SmartCanvasTool, config: { onChange: scheduleSave } },
-            calendar: { class: CalendarTool, config: { onChange: scheduleSave } },
-            voice: { class: VoiceMemo, config: { onChange: scheduleSave } },
-            recall: { class: RecallTool, config: { onChange: scheduleSave } },
-            aiStream: { class: AIStreamBlock, config: { onChange: scheduleSave } }
+            scan: { class: ScanTool, config: { onChange: () => scheduleSave() } },
+            compute: { class: ComputeTool, config: { onChange: () => scheduleSave() } },
+            smartCanvas: { class: SmartCanvasTool, config: { onChange: () => scheduleSave() } },
+            calendar: { class: CalendarTool, config: { onChange: () => scheduleSave() } },
+            voice: { class: VoiceMemo, config: { onChange: () => scheduleSave() } },
+            recall: { class: RecallTool, config: { onChange: () => scheduleSave() } },
+            aiStream: { class: AIStreamBlock, config: { onChange: () => scheduleSave() } }
         };
 
+        const domObserver = new MutationObserver(() => { cancelAnimationFrame(updateRaf); updateRaf = requestAnimationFrame(updateAllTimestamps); });
+
+        function updateAllTimestamps() {
+            document.querySelectorAll('.ce-block').forEach(block => {
+                const id = block.getAttribute('data-id'); if (!id) return;
+                let timeEl = block.querySelector('.ce-block-time');
+                if (!timeEl) { timeEl = createEl('div', 'ce-block-time'); block.appendChild(timeEl); }
+                if (timestamps[id]) { timeEl.textContent = new Date(timestamps[id]).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); } 
+                else if (window.currentDateStr === todayStr && window.editor) {
+                    timestamps[id] = Date.now(); timeEl.textContent = new Date(timestamps[id]).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+                    scheduleSave(); 
+                }
+            });
+        }
+
+        // --- Asynchronous Save Queue ---
+        function executeSave() {
+            if (!window.editor || window.currentDateStr !== todayStr) { isSaving = false; hasPendingSave = false; return; }
+            
+            isSaving = true;
+            window.editor.save().then(outputData => {
+                outputData.timestamps = timestamps;
+                return appDB.save(window.currentDateStr, outputData);
+            }).then(() => {
+                const indicator = document.getElementById('save-indicator');
+                if (indicator && !appDB.isMemoryOnly) {
+                    indicator.classList.add('visible');
+                    setTimeout(() => indicator.classList.remove('visible'), 1500);
+                }
+            }).catch(e => console.error("Editor core save failed:", e))
+            .finally(() => {
+                isSaving = false;
+                if (hasPendingSave) { hasPendingSave = false; executeSave(); }
+            });
+        }
+
+        function scheduleSave(immediate = false) {
+            if (appDB.isMemoryOnly) return; // Don't churn memory if IDB is disabled
+            clearTimeout(saveTimeout);
+            if (immediate) {
+                if (isSaving) hasPendingSave = true; else executeSave();
+            } else {
+                saveTimeout = setTimeout(() => { if (isSaving) hasPendingSave = true; else executeSave(); }, 800);
+            }
+        }
+
+        // App lifecycle hooks for safety
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') scheduleSave(true); });
+        window.addEventListener('pagehide', () => scheduleSave(true));
+        
         document.getElementById('date-header').onclick = () => {
+            scheduleSave(true);
             const [y, m, d] = window.currentDateStr.split('-').map(Number);
             DatePicker.open(new Date(y, m - 1, d), (selectedDate) => {
                 const selectedStr = getLocalYYYYMMDD(selectedDate);
@@ -951,32 +1043,6 @@
             }, { showTime: false, disableFuture: true, onlyNotes: true }); 
         };
 
-        const domObserver = new MutationObserver(() => { cancelAnimationFrame(updateRaf); updateRaf = requestAnimationFrame(updateAllTimestamps); });
-
-        function updateAllTimestamps() {
-            document.querySelectorAll('.ce-block').forEach(block => {
-                const id = block.getAttribute('data-id'); if (!id) return;
-                let timeEl = block.querySelector('.ce-block-time');
-                if (!timeEl) { timeEl = createEl('div', 'ce-block-time'); block.appendChild(timeEl); }
-                if (timestamps[id]) { timeEl.textContent = new Date(timestamps[id]).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); } 
-                else if (window.currentDateStr === todayStr && window.editor && !window.editor.readOnly) {
-                    timestamps[id] = Date.now(); timeEl.textContent = new Date(timestamps[id]).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-                    scheduleSave(); 
-                }
-            });
-        }
-
-        function scheduleSave() {
-            if (window.editor && !window.editor.readOnly) {
-                clearTimeout(saveTimeout);
-                saveTimeout = setTimeout(async () => {
-                    const outputData = await window.editor.save();
-                    outputData.timestamps = timestamps;
-                    appDB.save(window.currentDateStr, outputData);
-                }, 500);
-            }
-        }
-
         // ============================================================================
         // SEAMLESS AI INTERCEPTOR
         // ============================================================================
@@ -984,62 +1050,62 @@
             if (e.key === 'Enter') {
                 if (!window.editor) return;
                 const activeIndex = window.editor.blocks.getCurrentBlockIndex();
-                const activeBlock = window.editor.blocks.getBlockByIndex(activeIndex);
+                if (activeIndex === undefined || activeIndex < 0) return;
                 
+                const activeBlock = window.editor.blocks.getBlockByIndex(activeIndex);
                 if (!activeBlock || activeBlock.name !== 'paragraph') return;
                 
-                const blockEl = activeBlock.holder;
-                const text = blockEl.textContent.replace(/\u00A0/g, ' ').trim(); 
-
+                const text = activeBlock.holder.textContent.replace(/\u00A0/g, ' ').trim(); 
                 const trigger = `@${CONFIG.AI_NAME.toLowerCase()} `;
 
                 if (text.toLowerCase().startsWith(trigger)) {
-                    e.preventDefault();
-                    e.stopPropagation();
+                    e.preventDefault(); e.stopPropagation();
 
                     const prompt = text.substring(trigger.length).trim();
                     if (!prompt) return;
+                    if (!aiEngine) { alert(`${CONFIG.AI_NAME} is still booting. Please wait a moment.`); return; }
 
-                    if (!aiEngine) {
-                        alert(`${CONFIG.AI_NAME} is still booting. Please wait a moment.`);
-                        return;
-                    }
-
-                    // Seamless replacement: Insert the AI stream at the same location, then remove the prompt
                     window.editor.blocks.insert('aiStream', { prompt: prompt }, {}, activeIndex, true);
                     window.editor.blocks.delete(activeIndex + 1);
                 }
             }
         }, true);
 
+        // ============================================================================
+        // EDITOR INITIALIZATION
+        // ============================================================================
         async function initEditor(date) {
-            if (window.editor) { domObserver.disconnect(); await window.editor.destroy(); window.editor = null; }
+            if (window.editor) { 
+                scheduleSave(true); 
+                domObserver.disconnect(); 
+                await window.editor.destroy(); 
+                window.editor = null; 
+            }
             
             const isToday = date === todayStr;
-            let savedData = appDB.cache[date] || { blocks: [] };
+            let cachedData = appDB.cache[date];
+            // Shallow clone structure, prevent direct array mutations on load
+            let editorData = cachedData ? { blocks: [...cachedData.blocks], timestamps: {...cachedData.timestamps} } : { blocks: [] };
             
-            if (isToday && (!savedData.blocks || savedData.blocks.length === 0)) {
-                savedData = {
-                    blocks: [
-                        { type: "paragraph", data: { text: `Type '@${CONFIG.AI_NAME} [prompt]' and hit Enter to collaborate...` } }
-                    ]
-                };
+            if (isToday && (!editorData.blocks || editorData.blocks.length === 0)) {
+                editorData = { blocks: [{ type: "paragraph", data: { text: `Type '@${CONFIG.AI_NAME} [prompt]' and hit Enter...` } }] };
             }
 
-            timestamps = savedData.timestamps || {};
+            timestamps = editorData.timestamps || {};
             document.getElementById('editorjs').innerHTML = '';
 
             window.editor = new EditorJS({
                 holder: 'editorjs',
                 placeholder: isToday ? `Start typing or call @${CONFIG.AI_NAME}...` : 'No notes available for this day.',
                 readOnly: !isToday,
-                data: savedData,
+                data: editorData,
                 tools: window.EDITOR_TOOLS_CONFIG,
                 onChange: () => { if (isToday) scheduleSave(); },
                 onReady: () => { domObserver.observe(document.getElementById('editorjs'), { childList: true, subtree: true }); updateAllTimestamps(); }
             });
         }
 
+        // Initialize app, respecting private mode limitations
         appDB.init().then(() => { initEditor(window.currentDateStr); });
 
     </script>
