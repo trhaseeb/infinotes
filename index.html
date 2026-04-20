@@ -101,7 +101,10 @@
 
         @keyframes pulse-opacity { 0%, 100% { opacity: 0.8; } 50% { opacity: 0.3; } }
 
-        .ce-block-time { font-size: 11px; color: var(--muted-text); text-align: right; padding-top: 6px; padding-bottom: 2px; padding-right: 2px; user-select: none; opacity: 0.7; font-weight: 500; }
+        .ce-block-time { display: flex; justify-content: flex-end; align-items: center; gap: 8px; font-size: 11px; color: var(--muted-text); text-align: right; padding-top: 6px; padding-bottom: 2px; padding-right: 2px; user-select: none; opacity: 0.7; font-weight: 500; }
+        .ce-block-author { display: inline-flex; align-items: center; padding: 2px 6px; border: 1px solid var(--border-color); border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+        .ce-block-author.ai { background: var(--text-color); color: var(--bg-color); border-color: var(--text-color); }
+        .ce-block-author.user { background: var(--muted-bg); color: var(--text-color); }
         
         /* --- SEAMLESS AI STREAM BLOCK STYLES --- */
         .ai-stream-wrapper { margin: 4px 0; padding: 4px 0; position: relative; }
@@ -237,7 +240,11 @@
         const CONFIG = {
             AI_NAME: "bro", 
             AI_PERSONALITY: "You are intelligent, youre chill, you leadn quick and your have a flawless memory. youre a bro",
-            PWA_LOGO_URL: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzAwMDAwMCI+PHBhdGggZD0iTTE0IDJINmEyIDIgMCAwIDAtMiAydjE2YTIgMiAwIDAgMCAyIDJoMTJhMiAyIDAgMCAwIDItMlY4bC02LTZ6Ii8+PC9zdmc+"
+            PWA_LOGO_URL: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzAwMDAwMCI+PHBhdGggZD0iTTE0IDJINmEyIDIgMCAwIDAtMiAydjE2YTIgMiAwIDAgMCAyIDJoMTJhMiAyIDAgMCAwIDItMlY4bC02LTZ6Ii8+PC9zdmc+",
+            EMBEDDING_MODEL_ID: "Xenova/all-MiniLM-L6-v2",
+            SEMANTIC_SEARCH_LIMIT: 8,
+            AI_MEMORY_LIMIT: 6,
+            SEMANTIC_MIN_SCORE: 0.22
         };
 
         document.getElementById('pwa-icon').href = CONFIG.PWA_LOGO_URL;
@@ -280,6 +287,139 @@
             children.forEach(c => c && el.append(c)); return el;
         }
 
+        function normalizePlainText(text = '') {
+            return String(text)
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<[^>]*>?/gm, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function clampText(text = '', maxLength = 1200) {
+            if (text.length <= maxLength) return text;
+            return text.slice(0, maxLength).trimEnd() + '...';
+        }
+
+        function escapeHTML(text = '') {
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function getListItemText(item = {}) {
+            return normalizePlainText(item.content || item.text || '');
+        }
+
+        function getBlockLabel(block = {}) {
+            const labels = {
+                paragraph: 'note',
+                header: 'header',
+                list: 'list',
+                checklist: 'checklist',
+                scan: 'scan',
+                compute: 'compute',
+                smartCanvas: 'canvas',
+                calendar: 'event',
+                voice: 'voice',
+                recall: 'recall'
+            };
+            return labels[block.type] || (block.type || 'block');
+        }
+
+        function getBlockSearchText(block = {}) {
+            if (!block.data || block.type === 'recall') return '';
+            if (block.type === 'paragraph' || block.type === 'header' || block.type === 'scan') return normalizePlainText(block.data.text || '');
+            if (block.type === 'list' || block.type === 'checklist') return (block.data.items || []).map(getListItemText).filter(Boolean).join(' | ');
+            if (block.type === 'calendar') return normalizePlainText(`${block.data.title || 'calendar event'} ${block.data.datetime || ''}`);
+            if (block.type === 'voice') return normalizePlainText(block.data.title || 'voice memo');
+            if (block.type === 'smartCanvas') return normalizePlainText(`${block.data.title || ''} ${block.data.mode || 'canvas'}`);
+            if (block.type === 'compute') return normalizePlainText(`${block.data.code || ''} ${normalizePlainText(block.data.output || '')}`);
+            return normalizePlainText(JSON.stringify(block.data));
+        }
+
+        function buildRecallSnippet(block = {}) {
+            if (!block.data) return 'Empty block';
+            if (block.type === 'paragraph' || block.type === 'header' || block.type === 'scan') return normalizePlainText(block.data.text || '') || 'Empty text';
+            if (block.type === 'calendar') return `Calendar: ${block.data.title || 'Untitled event'}`;
+            if (block.type === 'voice') return `Voice: ${block.data.title || 'Untitled memo'}`;
+            if (block.type === 'smartCanvas') return `Canvas: ${block.data.title || block.data.mode || 'Untitled canvas'}`;
+            if (block.type === 'list' || block.type === 'checklist') return (block.data.items || []).map(getListItemText).filter(Boolean).join(', ') || 'Empty list';
+            if (block.type === 'compute') return `Compute: ${block.data.code || ''}`.trim();
+            return `${getBlockLabel(block)} block`;
+        }
+
+        function getStableBlockId(block = {}, fallbackIndex = 0) {
+            return block.id || `${block.type || 'block'}-${fallbackIndex}`;
+        }
+
+        function findBlockById(dayData, blockId) {
+            if (!dayData || !dayData.blocks || !blockId) return null;
+            return dayData.blocks.find((block, index) => getStableBlockId(block, index) === blockId) || null;
+        }
+
+        function dotProduct(left = [], right = []) {
+            const size = Math.min(left.length, right.length);
+            let sum = 0;
+            for (let index = 0; index < size; index += 1) sum += left[index] * right[index];
+            return sum;
+        }
+
+        function tensorToVector(output) {
+            if (!output) return [];
+            if (typeof output.tolist === 'function') {
+                const list = output.tolist();
+                if (Array.isArray(list[0])) return list[0].map(Number);
+                return list.map(Number);
+            }
+            if (output.data) return Array.from(output.data, Number);
+            if (Array.isArray(output)) return output.flat(Infinity).map(Number);
+            return [];
+        }
+
+        function findEditorBlockIndexById(editorInstance, blockId) {
+            if (!editorInstance || !blockId) return -1;
+            for (let index = 0; index < editorInstance.blocks.getBlocksCount(); index += 1) {
+                const block = editorInstance.blocks.getBlockByIndex(index);
+                if (block && block.id === blockId) return index;
+            }
+            return -1;
+        }
+
+        const DB_VERSION = 3;
+
+        function ensureDatabaseStores(db) {
+            if (!db.objectStoreNames.contains('daily_notes')) db.createObjectStore('daily_notes');
+            if (!db.objectStoreNames.contains('semantic_index')) {
+                const semanticStore = db.createObjectStore('semantic_index', { keyPath: 'key' });
+                semanticStore.createIndex('by_date', 'date', { unique: false });
+            }
+            if (!db.objectStoreNames.contains('media_blobs')) {
+                const mediaBlobs = db.createObjectStore('media_blobs', { keyPath: 'id' });
+                mediaBlobs.createIndex('by_kind', 'kind', { unique: false });
+            }
+        }
+
+        function createObjectUrl(blob) {
+            try {
+                return URL.createObjectURL(blob);
+            } catch (error) {
+                console.error('Unable to create object URL:', error);
+                return '';
+            }
+        }
+
+        function revokeObjectUrl(url) {
+            if (!url || !url.startsWith('blob:')) return;
+            URL.revokeObjectURL(url);
+        }
+
+        function getAuthorLabel(author = 'user') {
+            return author === 'ai' ? CONFIG.AI_NAME : 'you';
+        }
+
         const NotificationEngine = {
             timers: new Map(),
             schedule: function(id, dt, title) {
@@ -307,10 +447,9 @@
             init() {
                 return new Promise((resolve) => {
                     try {
-                        const req = indexedDB.open(this.dbName, 1);
+                        const req = indexedDB.open(this.dbName, DB_VERSION);
                         req.onupgradeneeded = (e) => {
-                            const db = e.target.result;
-                            if (!db.objectStoreNames.contains(this.storeName)) db.createObjectStore(this.storeName);
+                            ensureDatabaseStores(e.target.result);
                         };
                         req.onsuccess = (e) => { 
                             this.db = e.target.result; 
@@ -366,6 +505,330 @@
             }
         }
         let appDB = new IndexedDBAdapter();
+
+        class MediaBlobStore {
+            constructor() {
+                this.dbName = 'InfiniteNotesDB';
+                this.storeName = 'media_blobs';
+                this.db = null;
+                this.isAvailable = true;
+            }
+
+            init() {
+                return new Promise((resolve) => {
+                    try {
+                        const req = indexedDB.open(this.dbName, DB_VERSION);
+                        req.onupgradeneeded = (e) => { ensureDatabaseStores(e.target.result); };
+                        req.onsuccess = (e) => { this.db = e.target.result; resolve(); };
+                        req.onerror = () => { this.isAvailable = false; resolve(); };
+                    } catch (error) {
+                        this.isAvailable = false;
+                        resolve();
+                    }
+                });
+            }
+
+            saveBlob(id, blob, kind = 'generic') {
+                return new Promise((resolve, reject) => {
+                    if (!this.db || !this.isAvailable || !id || !blob) return resolve();
+                    try {
+                        const tx = this.db.transaction(this.storeName, 'readwrite');
+                        tx.objectStore(this.storeName).put({ id, blob, kind, updatedAt: Date.now() });
+                        tx.oncomplete = () => resolve();
+                        tx.onerror = () => reject(tx.error);
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            }
+
+            getBlob(id) {
+                return new Promise((resolve) => {
+                    if (!this.db || !this.isAvailable || !id) return resolve(null);
+                    try {
+                        const tx = this.db.transaction(this.storeName, 'readonly');
+                        const req = tx.objectStore(this.storeName).get(id);
+                        req.onsuccess = () => resolve(req.result?.blob || null);
+                        req.onerror = () => resolve(null);
+                    } catch (error) {
+                        resolve(null);
+                    }
+                });
+            }
+        }
+        let mediaStore = new MediaBlobStore();
+
+        class VectorDBAdapter {
+            constructor() {
+                this.dbName = 'InfiniteNotesDB';
+                this.storeName = 'semantic_index';
+                this.cache = new Map();
+                this.pendingDays = new Map();
+                this.db = null;
+                this.embedder = null;
+                this.embedderPromise = null;
+                this.isProcessing = false;
+                this.isAvailable = true;
+                this.modelFailed = false;
+            }
+
+            init() {
+                return new Promise((resolve) => {
+                    try {
+                        const req = indexedDB.open(this.dbName, DB_VERSION);
+                        req.onupgradeneeded = (e) => {
+                            ensureDatabaseStores(e.target.result);
+                        };
+                        req.onsuccess = (e) => {
+                            this.db = e.target.result;
+                            this.loadAll().then(entries => {
+                                entries.forEach(entry => this.cache.set(entry.key, entry));
+                                resolve();
+                            });
+                        };
+                        req.onerror = () => { this.isAvailable = false; resolve(); };
+                    } catch (e) {
+                        this.isAvailable = false;
+                        resolve();
+                    }
+                });
+            }
+
+            loadAll() {
+                return new Promise(resolve => {
+                    if (!this.isAvailable || !this.db) return resolve([]);
+                    try {
+                        const tx = this.db.transaction(this.storeName, 'readonly');
+                        const store = tx.objectStore(this.storeName);
+                        const req = store.getAll();
+                        req.onsuccess = () => resolve(req.result || []);
+                        req.onerror = () => resolve([]);
+                    } catch (e) {
+                        resolve([]);
+                    }
+                });
+            }
+
+            async ensureEmbedder() {
+                if (this.embedder) return this.embedder;
+                if (this.modelFailed) throw new Error('Embedding model unavailable');
+                if (!this.embedderPromise) {
+                    this.embedderPromise = (async () => {
+                        const { pipeline, env } = await import('https://esm.run/@huggingface/transformers');
+                        env.allowRemoteModels = true;
+                        env.useBrowserCache = true;
+
+                        if (navigator.gpu) {
+                            try {
+                                return await pipeline('feature-extraction', CONFIG.EMBEDDING_MODEL_ID, { device: 'webgpu' });
+                            } catch (error) {
+                                console.warn('WebGPU embeddings unavailable, falling back to WASM.', error);
+                            }
+                        }
+
+                        return pipeline('feature-extraction', CONFIG.EMBEDDING_MODEL_ID, { dtype: 'q8' });
+                    })().then(embedder => {
+                        this.embedder = embedder;
+                        return embedder;
+                    }).catch(error => {
+                        this.modelFailed = true;
+                        this.embedderPromise = null;
+                        throw error;
+                    });
+                }
+                return this.embedderPromise;
+            }
+
+            async embedText(text) {
+                const normalized = clampText(normalizePlainText(text), 1200);
+                if (!normalized) return null;
+                try {
+                    const embedder = await this.ensureEmbedder();
+                    const output = await embedder(normalized, { pooling: 'mean', normalize: true });
+                    const vector = tensorToVector(output);
+                    return vector.length ? vector : null;
+                } catch (error) {
+                    console.error('Embedding generation failed:', error);
+                    return null;
+                }
+            }
+
+            extractEntries(dateStr, dayData) {
+                if (!dayData || !dayData.blocks) return [];
+                return dayData.blocks.map((block, index) => {
+                    if (block.type === 'recall') return null;
+                    const searchText = clampText(getBlockSearchText(block), 1200);
+                    if (!searchText) return null;
+                    const blockId = getStableBlockId(block, index);
+                    const timestamp = (dayData.timestamps && block.id && dayData.timestamps[block.id]) || 0;
+                    return {
+                        key: `${dateStr}::${blockId}`,
+                        date: dateStr,
+                        blockId,
+                        type: block.type,
+                        searchText,
+                        timestamp
+                    };
+                }).filter(Boolean);
+            }
+
+            ensureBackfill(noteCache) {
+                if (!this.isAvailable || this.cache.size > 0 || !noteCache) return;
+                Object.entries(noteCache).forEach(([dateStr, dayData]) => this.scheduleIndexDay(dateStr, dayData));
+            }
+
+            scheduleIndexDay(dateStr, dayData) {
+                if (!this.isAvailable || !dateStr || !dayData || !dayData.blocks) return;
+                this.pendingDays.set(dateStr, JSON.parse(JSON.stringify(dayData)));
+                void this.processQueue();
+            }
+
+            async processQueue() {
+                if (this.isProcessing) return;
+                this.isProcessing = true;
+                while (this.pendingDays.size > 0) {
+                    const [dateStr, dayData] = this.pendingDays.entries().next().value;
+                    this.pendingDays.delete(dateStr);
+                    try {
+                        await this.indexDay(dateStr, dayData);
+                    } catch (error) {
+                        console.error('Semantic indexing failed:', error);
+                    }
+                }
+                this.isProcessing = false;
+            }
+
+            async indexDay(dateStr, dayData) {
+                if (!this.db) return;
+                const entries = this.extractEntries(dateStr, dayData);
+                const indexedEntries = [];
+                for (const entry of entries) {
+                    const vector = await this.embedText(entry.searchText);
+                    if (vector) indexedEntries.push({ ...entry, vector });
+                }
+                await this.replaceDayEntries(dateStr, indexedEntries);
+            }
+
+            replaceDayEntries(dateStr, entries) {
+                return new Promise((resolve, reject) => {
+                    if (!this.db) return resolve();
+                    try {
+                        const tx = this.db.transaction(this.storeName, 'readwrite');
+                        const store = tx.objectStore(this.storeName);
+                        const dateIndex = store.index('by_date');
+                        const removeReq = dateIndex.openCursor(IDBKeyRange.only(dateStr));
+
+                        removeReq.onsuccess = (event) => {
+                            const cursor = event.target.result;
+                            if (cursor) {
+                                store.delete(cursor.primaryKey);
+                                cursor.continue();
+                                return;
+                            }
+                            entries.forEach(entry => store.put(entry));
+                        };
+                        removeReq.onerror = () => reject(removeReq.error);
+
+                        tx.oncomplete = () => {
+                            Array.from(this.cache.keys()).forEach(key => {
+                                if (key.startsWith(`${dateStr}::`)) this.cache.delete(key);
+                            });
+                            entries.forEach(entry => this.cache.set(entry.key, entry));
+                            resolve();
+                        };
+                        tx.onerror = () => reject(tx.error);
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            }
+
+            async search(query, options = {}) {
+                const normalized = normalizePlainText(query);
+                if (!normalized || !this.cache.size) return [];
+                const queryVector = await this.embedText(normalized);
+                if (!queryVector) return [];
+                const minScore = options.minScore ?? CONFIG.SEMANTIC_MIN_SCORE;
+                const limit = options.limit ?? CONFIG.SEMANTIC_SEARCH_LIMIT;
+                const results = [];
+
+                for (const entry of this.cache.values()) {
+                    if (options.excludeDate && entry.date === options.excludeDate) continue;
+                    const score = dotProduct(queryVector, entry.vector || []);
+                    if (score >= minScore) results.push({ ...entry, score, source: 'semantic' });
+                }
+
+                results.sort((left, right) => {
+                    if (right.score !== left.score) return right.score - left.score;
+                    const dateDiff = new Date(right.date).getTime() - new Date(left.date).getTime();
+                    if (dateDiff !== 0) return dateDiff;
+                    return (right.timestamp || 0) - (left.timestamp || 0);
+                });
+                return results.slice(0, limit);
+            }
+        }
+        let vectorDB = new VectorDBAdapter();
+
+        function collectKeywordRecallResults(query, options = {}) {
+            const normalized = normalizePlainText(query).toLowerCase();
+            if (!normalized) return [];
+            const results = [];
+            Object.entries(appDB.cache).forEach(([dateStr, dayData]) => {
+                if (options.excludeDate && dateStr === options.excludeDate) return;
+                if (!dayData || !dayData.blocks) return;
+                dayData.blocks.forEach(block => {
+                    if (block.type === 'recall') return;
+                    const searchableText = `${getBlockLabel(block)} ${getBlockSearchText(block)}`.toLowerCase();
+                    if (!searchableText.includes(normalized)) return;
+                    const timestamp = (dayData.timestamps && block.id && dayData.timestamps[block.id]) || 0;
+                    results.push({ date: dateStr, block, timestamp, source: 'keyword', score: 1 });
+                });
+            });
+            results.sort((left, right) => {
+                const dateDiff = new Date(right.date).getTime() - new Date(left.date).getTime();
+                if (dateDiff !== 0) return dateDiff;
+                return (right.timestamp || 0) - (left.timestamp || 0);
+            });
+            return results;
+        }
+
+        function hydrateSemanticRecallResult(result) {
+            const dayData = appDB.cache[result.date];
+            const block = findBlockById(dayData, result.blockId);
+            if (!block || block.type === 'recall') return null;
+            return {
+                date: result.date,
+                block,
+                timestamp: result.timestamp || 0,
+                source: result.source || 'semantic',
+                score: result.score || 0
+            };
+        }
+
+        function mergeRecallResults(keywordResults, semanticResults, limit = 12) {
+            const merged = new Map();
+            const upsert = (result) => {
+                if (!result || !result.block) return;
+                const key = `${result.date}::${result.block.id || buildRecallSnippet(result.block)}`;
+                const existing = merged.get(key);
+                if (existing) {
+                    existing.score = Math.max(existing.score || 0, result.score || 0);
+                    existing.source = existing.source === result.source ? existing.source : 'hybrid';
+                    return;
+                }
+                merged.set(key, { ...result });
+            };
+
+            keywordResults.slice(0, limit).forEach((result, index) => upsert({ ...result, score: 1.1 - (index * 0.01) }));
+            semanticResults.slice(0, limit).forEach(upsert);
+
+            return Array.from(merged.values()).sort((left, right) => {
+                if ((right.score || 0) !== (left.score || 0)) return (right.score || 0) - (left.score || 0);
+                const dateDiff = new Date(right.date).getTime() - new Date(left.date).getTime();
+                if (dateDiff !== 0) return dateDiff;
+                return (right.timestamp || 0) - (left.timestamp || 0);
+            }).slice(0, limit);
+        }
 
         // ============================================================================
         // GLOBAL UI: DATE PICKER MODAL
@@ -549,7 +1012,7 @@
                             let text = JSON.stringify(b.data).toLowerCase();
                             if (text.includes(q)) {
                                 if (b.data.text) results.push(b.data.text.replace(/<[^>]*>?/gm, ''));
-                                else if (b.data.items) results.push(...b.data.items.map(i=>i.content.replace(/<[^>]*>?/gm, '')));
+                                else if (b.data.items) results.push(...b.data.items.map(i => getListItemText(i)));
                                 else if (b.data.title) results.push(b.data.title);
                             }
                         });
@@ -559,100 +1022,303 @@
                 const nums = (query) => { let texts = find(query); let numbers = []; texts.forEach(t => { let matches = t.match(/-?\d+(\.\d+)?/g); if (matches) numbers.push(...matches.map(Number)); }); return numbers; };
                 const sum = (query) => nums(query).reduce((a,b)=>a+b, 0);
                 const avg = (query) => { let n = nums(query); return n.length ? sum(query)/n.length : 0; };
-                const allowed = { Math, Date, Number, String, Array, sum, avg, nums, find };
-                const ctx = new Proxy({}, { has: () => true, get: (target, prop) => { if (prop === Symbol.unscopables) return undefined; if (prop in allowed) return allowed[prop]; if (typeof prop === 'string') return sum(prop.toLowerCase()); return undefined; } });
+                const min = (query) => { const values = Array.isArray(query) ? query.map(Number) : nums(query); return values.length ? Math.min(...values) : 0; };
+                const max = (query) => { const values = Array.isArray(query) ? query.map(Number) : nums(query); return values.length ? Math.max(...values) : 0; };
+                const count = (query) => Array.isArray(query) ? query.length : find(query).length;
+                const ctx = {
+                    sum,
+                    avg,
+                    nums,
+                    find,
+                    min,
+                    max,
+                    count,
+                    abs: Math.abs,
+                    ceil: Math.ceil,
+                    floor: Math.floor,
+                    round: Math.round,
+                    sqrt: Math.sqrt,
+                    pow: Math.pow,
+                    log: Math.log,
+                    exp: Math.exp,
+                    now: () => Date.now(),
+                    today: () => getLocalYYYYMMDD(new Date()),
+                    Math
+                };
+
+                const tokenize = (source) => {
+                    const tokens = [];
+                    let index = 0;
+                    while (index < source.length) {
+                        const char = source[index];
+                        if (/\s/.test(char)) { index += 1; continue; }
+                        if ('()+-*/%,[].'.includes(char)) { tokens.push({ type: char, value: char }); index += 1; continue; }
+                        if (char === '"' || char === "'") {
+                            const quote = char;
+                            let value = '';
+                            index += 1;
+                            while (index < source.length && source[index] !== quote) {
+                                if (source[index] === '\\' && index + 1 < source.length) {
+                                    value += source[index + 1];
+                                    index += 2;
+                                    continue;
+                                }
+                                value += source[index];
+                                index += 1;
+                            }
+                            if (source[index] !== quote) throw new Error('Unterminated string literal');
+                            index += 1;
+                            tokens.push({ type: 'string', value });
+                            continue;
+                        }
+                        const numberMatch = source.slice(index).match(/^\d+(\.\d+)?/);
+                        if (numberMatch) {
+                            tokens.push({ type: 'number', value: Number(numberMatch[0]) });
+                            index += numberMatch[0].length;
+                            continue;
+                        }
+                        const identifierMatch = source.slice(index).match(/^[A-Za-z_][A-Za-z0-9_]*/);
+                        if (identifierMatch) {
+                            tokens.push({ type: 'identifier', value: identifierMatch[0] });
+                            index += identifierMatch[0].length;
+                            continue;
+                        }
+                        throw new Error(`Unexpected token '${char}'`);
+                    }
+                    return tokens;
+                };
+
+                const parse = (tokens) => {
+                    let position = 0;
+                    const peek = () => tokens[position];
+                    const match = (...types) => {
+                        if (position >= tokens.length) return false;
+                        if (!types.includes(tokens[position].type)) return false;
+                        position += 1;
+                        return true;
+                    };
+                    const consume = (type, message) => {
+                        if (match(type)) return tokens[position - 1];
+                        throw new Error(message);
+                    };
+                    const resolveIdentifier = (parts) => {
+                        const fullPath = parts.join('.');
+                        if (fullPath === 'Math.PI') return Math.PI;
+                        if (fullPath === 'Math.E') return Math.E;
+                        if (parts[0] === 'Math' && parts.length === 2) {
+                            const value = Math[parts[1]];
+                            if (typeof value === 'function') return value.bind(Math);
+                            return value;
+                        }
+                        if (Object.prototype.hasOwnProperty.call(ctx, fullPath)) return ctx[fullPath];
+                        if (parts.length === 1 && Object.prototype.hasOwnProperty.call(ctx, parts[0])) return ctx[parts[0]];
+                        if (parts.length === 1) return sum(parts[0].toLowerCase());
+                        throw new Error(`Unknown identifier '${fullPath}'`);
+                    };
+                    const parseExpression = () => parseAdditive();
+                    const parseAdditive = () => {
+                        let value = parseMultiplicative();
+                        while (true) {
+                            if (match('+')) value = value + parseMultiplicative();
+                            else if (match('-')) value = value - parseMultiplicative();
+                            else break;
+                        }
+                        return value;
+                    };
+                    const parseMultiplicative = () => {
+                        let value = parseUnary();
+                        while (true) {
+                            if (match('*')) value = value * parseUnary();
+                            else if (match('/')) value = value / parseUnary();
+                            else if (match('%')) value = value % parseUnary();
+                            else break;
+                        }
+                        return value;
+                    };
+                    const parseUnary = () => {
+                        if (match('+')) return +parseUnary();
+                        if (match('-')) return -parseUnary();
+                        return parsePrimary();
+                    };
+                    const parseArgs = () => {
+                        const args = [];
+                        if (peek()?.type === ')') return args;
+                        do { args.push(parseExpression()); } while (match(','));
+                        return args;
+                    };
+                    const parsePrimary = () => {
+                        if (match('number')) return tokens[position - 1].value;
+                        if (match('string')) return tokens[position - 1].value;
+                        if (match('(')) {
+                            const value = parseExpression();
+                            consume(')', 'Missing closing parenthesis');
+                            return value;
+                        }
+                        if (match('[')) {
+                            const items = [];
+                            if (peek()?.type !== ']') {
+                                do { items.push(parseExpression()); } while (match(','));
+                            }
+                            consume(']', 'Missing closing bracket');
+                            return items;
+                        }
+                        if (match('identifier')) {
+                            const parts = [tokens[position - 1].value];
+                            while (match('.')) parts.push(consume('identifier', 'Expected identifier after dot').value);
+                            const value = resolveIdentifier(parts);
+                            if (match('(')) {
+                                const args = parseArgs();
+                                consume(')', 'Missing closing parenthesis after function call');
+                                if (typeof value !== 'function') throw new Error(`'${parts.join('.')}' is not callable`);
+                                return value(...args);
+                            }
+                            return value;
+                        }
+                        throw new Error('Expected number, string, identifier, array, or parenthesized expression');
+                    };
+                    const result = parseExpression();
+                    if (position < tokens.length) throw new Error(`Unexpected token '${tokens[position].value}'`);
+                    return result;
+                };
 
                 try {
-                    let codeText = this.data.code; const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-                    const fn = new AsyncFunction('ctx', `with (ctx) { return eval(${JSON.stringify(codeText)}); }`);
-                    const result = await fn(ctx);
+                    const result = parse(tokenize(this.data.code));
                     if (result === undefined || result === null || Number.isNaN(result)) { this.output.innerHTML = ''; this.data.output = ''; } 
                     else if (Array.isArray(result) && result.length >= 2 && result.every(n => typeof n === 'number')) {
                         const min = Math.min(...result); const max = Math.max(...result); const range = (max - min) || 1;
                         const points = result.map((val, i) => `${(i / (result.length - 1)) * 100},${40 - ((val - min) / range) * 40}`).join(' ');
                         this.data.output = `<div style="font-size: 11px; color: var(--muted-text); margin-bottom: 4px;">Array: [${result.join(', ')}]</div><svg viewBox="0 -5 100 50" style="width: 100%; height: 60px; overflow: visible;" preserveAspectRatio="none"><polyline fill="none" stroke="var(--text-color)" stroke-width="2" points="${points}"></polyline></svg>`;
                         this.output.innerHTML = this.data.output; this.output.classList.remove('compute-error');
-                    } else { this.data.output = typeof result === 'object' ? JSON.stringify(result) : String(result); this.output.innerHTML = this.data.output; this.output.classList.remove('compute-error'); }
-                } catch(e) { this.data.output = `<span class="compute-error">${e.message}</span>`; this.output.innerHTML = this.data.output; }
+                    } else {
+                        this.data.output = typeof result === 'object' ? escapeHTML(JSON.stringify(result)) : escapeHTML(String(result));
+                        this.output.innerHTML = this.data.output; this.output.classList.remove('compute-error');
+                    }
+                } catch(e) { this.data.output = `<span class="compute-error">${escapeHTML(e.message)}</span>`; this.output.innerHTML = this.data.output; }
                 if(this.config.onChange) this.config.onChange();
             }
             save() { return this.data; }
         }
 
-        // --- SEAMLESS AI STREAM BLOCK ---
-        class AIStreamBlock {
-            constructor({data, config, api}) { this.api = api; this.config = config; this.prompt = data.prompt || ""; this.fullMarkdown = ""; this.wrapper = createEl('div', 'ai-stream-wrapper'); }
-            render() {
-                this.contentEl = createEl('div', 'ai-stream-content');
-                this.cursor = createEl('span', 'ai-cursor');
-                this.contentEl.appendChild(this.cursor);
-                this.wrapper.appendChild(this.contentEl);
-                setTimeout(() => this.generateResponse(), 50);
-                return this.wrapper;
+        function parseMarkdownToEditorBlocks(markdown) {
+            const blocksToInsert = [];
+            const rawSections = String(markdown || '').split(/(?=\[COMPUTE\])|(?<=\[\/COMPUTE\])|\n\n/);
+
+            rawSections.forEach(section => {
+                const trimmed = section.trim();
+                if (!trimmed) return;
+
+                if (trimmed.startsWith('[COMPUTE]') && trimmed.endsWith('[/COMPUTE]')) {
+                    blocksToInsert.push({ type: 'compute', data: { code: trimmed.replace('[COMPUTE]', '').replace('[/COMPUTE]', '').trim() } });
+                    return;
+                }
+
+                const headerMatch = trimmed.match(/^(#{1,6})\s+(.*)/);
+                if (headerMatch) {
+                    blocksToInsert.push({ type: 'header', data: { text: headerMatch[2], level: Math.min(headerMatch[1].length, 3) } });
+                    return;
+                }
+
+                if (trimmed.match(/^[-*]\s*\[[ xX]\]/)) {
+                    const items = trimmed.split('\n').filter(line => line.trim()).map(line => ({
+                        text: line.replace(/^[-*]\s*\[[ xX]\]\s*/, '').trim(),
+                        checked: line.includes('[x]') || line.includes('[X]')
+                    }));
+                    blocksToInsert.push({ type: 'checklist', data: { items } });
+                    return;
+                }
+
+                if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || /^\d+\.\s/.test(trimmed)) {
+                    const isOrdered = /^\d+\.\s/.test(trimmed);
+                    const items = trimmed.split('\n').filter(line => line.trim()).map(line => ({
+                        content: line.replace(/^[-*]\s|^\d+\.\s/, '').trim()
+                    }));
+                    blocksToInsert.push({ type: 'list', data: { style: isOrdered ? 'ordered' : 'unordered', items } });
+                    return;
+                }
+
+                blocksToInsert.push({ type: 'paragraph', data: { text: trimmed.replace(/\n/g, '<br>') } });
+            });
+
+            return blocksToInsert.length ? blocksToInsert : [{ type: 'paragraph', data: { text: '...' } }];
+        }
+
+        async function getSemanticMemoryContext(query) {
+            const keywordResults = collectKeywordRecallResults(query, { excludeDate: window.currentDateStr });
+            const semanticResults = (await vectorDB.search(query, {
+                limit: CONFIG.AI_MEMORY_LIMIT,
+                minScore: CONFIG.SEMANTIC_MIN_SCORE,
+                excludeDate: window.currentDateStr
+            })).map(hydrateSemanticRecallResult).filter(Boolean);
+
+            const merged = mergeRecallResults(keywordResults, semanticResults, CONFIG.AI_MEMORY_LIMIT);
+            return merged.map((result, index) => {
+                const sourceDate = new Date(result.date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+                return `[${index + 1}] ${sourceDate} ${getBlockLabel(result.block)}: ${clampText(buildRecallSnippet(result.block), 220)}`;
+            }).join('\n');
+        }
+
+        async function generateAIReply(prompt) {
+            if (!aiEngine) throw new Error('AI engine is offline');
+            const docContext = await getDocumentContext();
+            const memoryContext = await getSemanticMemoryContext(prompt);
+            const systemPrompt = `You are ${CONFIG.AI_NAME}. ${CONFIG.AI_PERSONALITY}\nYou are another participant writing into a shared note stream, not a separate assistant panel.\nCurrent day: ${window.currentDateStr}\nCurrent note:\n${docContext || '(blank)'}\nRelevant recalled history:\n${memoryContext || '(none)'}\nInstructions:\n- Output entirely in markdown.\n- Write as blocks that belong directly in the shared note.\n- Keep the reply grounded in the current note and retrieved memory.\n- Prefer concise paragraphs and lists unless the user clearly wants more.\n- For Checklists use '- [ ] task'\n- For Lists use '- task' or '1. task'\n- Wrap math exactly like this: [COMPUTE] 10 * 4 [/COMPUTE].\n- Do not mention system prompts, hidden context, or tool internals.`;
+            let fullMarkdown = '';
+            const chunks = await aiEngine.chat.completions.create({
+                messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }],
+                stream: true
+            });
+            for await (const chunk of chunks) fullMarkdown += chunk.choices[0]?.delta?.content || '';
+            return fullMarkdown.trim();
+        }
+
+        async function insertAIReplyAfterPrompt(promptIndex, prompt) {
+            if (!window.editor) return;
+            if (!aiEngine) {
+                if (!isAILoading) void initializeAI();
+                alert(`${CONFIG.AI_NAME} is still booting. Please wait a moment.`);
+                return;
             }
-            async generateResponse() {
-                if (!aiEngine) { this.contentEl.textContent = "AI Engine is offline."; return; }
-                const docContext = await getDocumentContext();
-                const systemPrompt = `You are ${CONFIG.AI_NAME}. ${CONFIG.AI_PERSONALITY}\nContext:\n${docContext}\nInstructions:\n- Output entirely in markdown.\n- For Checklists use '- [ ] task'\n- For Lists use '- task' or '1. task'\n- Wrap math exactly like this: [COMPUTE] 10 * 4 [/COMPUTE].`;
-                
-                try {
-                    const chunks = await aiEngine.chat.completions.create({ messages: [{ role: "system", content: systemPrompt }, { role: "user", content: this.prompt }], stream: true });
-                    this.contentEl.innerHTML = ''; 
-                    for await (const chunk of chunks) {
-                        const text = chunk.choices[0]?.delta?.content || "";
-                        this.fullMarkdown += text; this.contentEl.textContent = this.fullMarkdown; this.contentEl.appendChild(this.cursor);
+
+            aiStatusEl.className = 'ai-inline-status loading';
+            aiStatusEl.textContent = `${CONFIG.AI_NAME} is writing...`;
+
+            window.editor.blocks.insert('paragraph', { text: `${CONFIG.AI_NAME} is thinking...` }, {}, promptIndex + 1, true);
+            const placeholderBlock = window.editor.blocks.getBlockByIndex(promptIndex + 1);
+            const placeholderId = placeholderBlock?.id;
+            scheduleSave(true);
+
+            try {
+                const markdown = await generateAIReply(prompt);
+                const blocksToInsert = parseMarkdownToEditorBlocks(markdown);
+                const placeholderIndex = findEditorBlockIndexById(window.editor, placeholderId);
+                if (placeholderIndex >= 0) {
+                    window.editor.blocks.delete(placeholderIndex);
+                    blocksToInsert.forEach((block, offset) => {
+                        window.editor.blocks.insert(block.type, block.data, {}, placeholderIndex + offset, true);
+                        const insertedBlock = window.editor.blocks.getBlockByIndex(placeholderIndex + offset);
+                        if (insertedBlock?.id) {
+                            setBlockAuthor(insertedBlock.id, 'ai');
+                            timestamps[insertedBlock.id] = Date.now() + offset;
+                        }
+                    });
+                }
+                aiStatusEl.className = 'ai-inline-status';
+                aiStatusEl.textContent = 'online';
+                scheduleSave(true);
+            } catch (error) {
+                const placeholderIndex = findEditorBlockIndexById(window.editor, placeholderId);
+                if (placeholderIndex >= 0) {
+                    window.editor.blocks.delete(placeholderIndex);
+                    window.editor.blocks.insert('paragraph', { text: `${CONFIG.AI_NAME} hit an error: ${error.message}` }, {}, placeholderIndex, true);
+                    const insertedBlock = window.editor.blocks.getBlockByIndex(placeholderIndex);
+                    if (insertedBlock?.id) {
+                        setBlockAuthor(insertedBlock.id, 'ai');
+                        timestamps[insertedBlock.id] = Date.now();
                     }
-                    this.cursor.remove(); this.replaceWithParsedBlocks();
-                } catch (e) { this.contentEl.textContent = "Error: " + e.message; this.cursor.remove(); }
+                }
+                aiStatusEl.className = 'ai-inline-status error';
+                aiStatusEl.textContent = 'reply failed';
             }
-            
-            replaceWithParsedBlocks() {
-                const blocksToInsert = [];
-                const rawSections = this.fullMarkdown.split(/(?=\[COMPUTE\])|(?<=\[\/COMPUTE\])|\n\n/);
-
-                rawSections.forEach(section => {
-                    const trimmed = section.trim(); if (!trimmed) return;
-
-                    if (trimmed.startsWith('[COMPUTE]') && trimmed.endsWith('[/COMPUTE]')) {
-                        blocksToInsert.push({ type: 'compute', data: { code: trimmed.replace('[COMPUTE]', '').replace('[/COMPUTE]', '').trim() } });
-                        return;
-                    }
-
-                    const headerMatch = trimmed.match(/^(#{1,6})\s+(.*)/);
-                    if (headerMatch) {
-                        blocksToInsert.push({ type: 'header', data: { text: headerMatch[2], level: Math.min(headerMatch[1].length, 3) } });
-                        return;
-                    }
-
-                    if (trimmed.match(/^-\s*\[[ xX]\]/)) {
-                        const items = trimmed.split('\n').filter(l => l.trim()).map(line => {
-                            const checked = line.includes('[x]') || line.includes('[X]');
-                            return { text: line.replace(/^-\s*\[[ xX]\]\s*/, '').trim(), checked: checked };
-                        });
-                        blocksToInsert.push({ type: 'checklist', data: { items: items } });
-                        return;
-                    }
-
-                    if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || /^\d+\.\s/.test(trimmed)) {
-                        const isOrdered = /^\d+\.\s/.test(trimmed);
-                        const items = trimmed.split('\n').filter(l => l.trim()).map(line => {
-                            return { content: line.replace(/^[-*]\s|^\d+\.\s/, '').trim() };
-                        });
-                        blocksToInsert.push({ type: 'list', data: { style: isOrdered ? 'ordered' : 'unordered', items: items } });
-                        return;
-                    }
-
-                    blocksToInsert.push({ type: 'paragraph', data: { text: trimmed.replace(/\n/g, '<br>') } });
-                });
-
-                const currentIndex = this.api.blocks.getCurrentBlockIndex();
-                this.api.blocks.delete(currentIndex);
-                blocksToInsert.forEach((block, idx) => { this.api.blocks.insert(block.type, block.data, {}, currentIndex + idx, true); });
-                
-                if(this.config.onChange) this.config.onChange();
-                scheduleSave(true); // Force queue evaluation
-            }
-            save() { return { prompt: this.prompt, markdown: this.fullMarkdown }; }
         }
 
         class RecallTool {
@@ -668,40 +1334,46 @@
                 const icon = createEl('div', 'recall-search-icon', {innerHTML: ICONS.search});
                 const input = createEl('input', 'recall-search-input', { type: 'text', placeholder: 'Search past notes, maps, voice...' });
                 const dropdown = createEl('div', 'recall-dropdown');
+                let queryVersion = 0;
 
-                input.addEventListener('focus', async () => { if (window.editor) { const currentData = await window.editor.save(); appDB.cache[window.currentDateStr] = currentData; } });
-                input.addEventListener('input', (e) => {
-                    const query = e.target.value.toLowerCase().trim(); dropdown.innerHTML = '';
+                input.addEventListener('focus', async () => {
+                    if (!window.editor) return;
+                    const currentData = await window.editor.save();
+                    currentData.timestamps = timestamps;
+                    currentData.authors = blockAuthors;
+                    appDB.cache[window.currentDateStr] = currentData;
+                    vectorDB.scheduleIndexDay(window.currentDateStr, currentData);
+                });
+                input.addEventListener('input', async (e) => {
+                    const query = e.target.value.trim();
+                    const currentQuery = ++queryVersion;
+                    dropdown.innerHTML = '';
                     if (!query) { dropdown.classList.remove('active'); return; }
-                    let results = [];
-                    Object.entries(appDB.cache).forEach(([dateStr, dayData]) => {
-                        if (!dayData.blocks) return;
-                        dayData.blocks.forEach(block => {
-                            if (block.type === 'recall') return; 
-                            let searchableText = block.type.toLowerCase() + " ";
-                            if (block.data.text) searchableText += block.data.text.toLowerCase() + " ";
-                            if (block.data.title) searchableText += block.data.title.toLowerCase() + " ";
-                            if (block.data.items) searchableText += block.data.items.map(i => i.content || i.text).join(' ').toLowerCase() + " ";
-                            if (block.type === 'smartCanvas') searchableText += "canvas drawing map sketch photo image ";
-                            if (block.type === 'voice') searchableText += "voice audio memo recording mic ";
-                            if (block.type === 'calendar') searchableText += "calendar event date reminder schedule ";
-                            if (searchableText.includes(query)) { results.push({ date: dateStr, block: block, timestamp: dayData.timestamps?.[block.id] }); }
-                        });
-                    });
-                    results.sort((a, b) => { const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime(); if (dateDiff !== 0) return dateDiff; return (b.timestamp || 0) - (a.timestamp || 0); });
+
+                    dropdown.appendChild(createEl('div', 'recall-result-item', { textContent: 'Searching notes...', style: 'color: var(--muted-text); cursor: default;' }));
+                    dropdown.classList.add('active');
+
+                    const keywordResults = collectKeywordRecallResults(query);
+                    let semanticResults = [];
+                    try {
+                        const semanticHits = await vectorDB.search(query, { limit: CONFIG.SEMANTIC_SEARCH_LIMIT, minScore: CONFIG.SEMANTIC_MIN_SCORE });
+                        semanticResults = semanticHits.map(hydrateSemanticRecallResult).filter(Boolean);
+                    } catch (error) {
+                        console.warn('Semantic recall unavailable:', error);
+                    }
+
+                    if (currentQuery !== queryVersion) return;
+                    dropdown.innerHTML = '';
+                    const results = mergeRecallResults(keywordResults, semanticResults, 12);
+
                     if (results.length > 0) {
                         results.forEach(res => {
                             const item = createEl('div', 'recall-result-item');
                             const dateObj = new Date(res.date + 'T00:00:00'); const displayDate = dateObj.toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
-                            let snippet = "";
-                            if (res.block.type === 'paragraph' || res.block.type === 'header' || res.block.type === 'scan') { snippet = res.block.data.text.replace(/<[^>]*>?/gm, ''); } 
-                            else if (res.block.type === 'calendar') { snippet = "📅 " + (res.block.data.title || "Calendar Event"); } 
-                            else if (res.block.type === 'voice') { snippet = "🎤 " + (res.block.data.title || "Voice Memo"); } 
-                            else if (res.block.type === 'smartCanvas') { snippet = "🖌️ " + (res.block.data.title || "Media Canvas"); } 
-                            else if (res.block.type === 'list' || res.block.type === 'checklist') { let items = res.block.data.items || []; snippet = "📝 " + items.map(i=>i.content || i.text || '').join(', ').replace(/<[^>]*>?/gm, ''); } 
-                            else { snippet = "📄 " + res.block.type.toUpperCase() + " Block"; }
+                            let snippet = buildRecallSnippet(res.block);
                             snippet = snippet.substring(0, 60) + (snippet.length > 60 ? '...' : '');
-                            item.appendChild(createEl('div', 'recall-result-meta', {textContent: `${displayDate}`}));
+                            const sourceLabel = res.source === 'hybrid' ? 'hybrid' : res.source || 'keyword';
+                            item.appendChild(createEl('div', 'recall-result-meta', {textContent: `${displayDate} • ${sourceLabel}`}));
                             item.appendChild(createEl('div', 'recall-result-snippet', {textContent: snippet}));
                             item.onclick = () => { this.data = { recalled: true, sourceDate: res.date, sourceTime: res.timestamp, sourceBlock: res.block }; this.render(); this.config.onChange(); };
                             dropdown.appendChild(item);
@@ -709,7 +1381,7 @@
                         dropdown.classList.add('active');
                     } else { dropdown.appendChild(createEl('div', 'recall-result-item', {textContent: 'No matches found', style: 'color: var(--muted-text); cursor: default;'})); dropdown.classList.add('active'); }
                 });
-                document.addEventListener('click', (e) => { if (!searchWrapper.contains(e.target)) dropdown.classList.remove('active'); });
+                searchWrapper.addEventListener('focusout', () => { setTimeout(() => { if (!searchWrapper.contains(document.activeElement)) dropdown.classList.remove('active'); }, 0); });
                 searchWrapper.append(icon, input, dropdown); setTimeout(() => input.focus(), 50); return searchWrapper;
             }
             renderRecalledState() {
@@ -737,9 +1409,10 @@
             static get toolbox() { return { title: 'Media Canvas', icon: ICONS.pen }; }
             constructor({data, config, api, readOnly}) {
                 this.api = api; this.config = config; this.readOnly = readOnly;
-                this.data = { mode: data.mode || null, title: data.title || '', lat: data.lat || 51.505, lng: data.lng || -0.09, zoom: data.zoom || 13, isLocked: data.isLocked || false, baseImage: data.baseImage || null, imgWidth: data.imgWidth || null, imgHeight: data.imgHeight || null, hasInitializedView: data.hasInitializedView || false, lines: data.lines || [], isDrawingActive: data.isDrawingActive || false };
+                this.data = { mode: data.mode || null, title: data.title || '', lat: data.lat || 51.505, lng: data.lng || -0.09, zoom: data.zoom || 13, isLocked: data.isLocked || false, baseImageId: data.baseImageId || null, imgWidth: data.imgWidth || null, imgHeight: data.imgHeight || null, hasInitializedView: data.hasInitializedView || false, lines: data.lines || [], isDrawingActive: data.isDrawingActive || false };
                 this.wrapper = createEl('div'); this.relativeFrame = createEl('div', 'canvas-relative-frame'); this.controls = createEl('div', 'block-controls-stack');
                 this.currentColor = '#EF4444'; this.lineLayers = []; this.currentPolyline = null; this.currentPoints = [];
+                this.baseImageUrl = '';
             }
             render() {
                 this.wrapper.innerHTML = ''; 
@@ -768,18 +1441,36 @@
                 mapBtn.onclick = () => { this.data.mode = 'map'; this.data.isLocked = false; this.data.isDrawingActive = false; this.render(); if(this.config.onChange) this.config.onChange(); };
                 blankBtn.onclick = () => { this.data.mode = 'blank'; this.data.isLocked = false; this.data.isDrawingActive = false; this.render(); if(this.config.onChange) this.config.onChange(); };
                 photoBtn.onclick = () => fileInput.click();
-                fileInput.onchange = (e) => {
+                fileInput.onchange = async (e) => {
                     const file = e.target.files[0];
                     if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (re) => { 
-                            const img = new Image();
-                            img.onload = () => { this.data.baseImage = re.target.result; this.data.imgWidth = img.width; this.data.imgHeight = img.height; this.data.mode = 'image'; this.data.isLocked = false; this.data.isDrawingActive = false; this.render(); if(this.config.onChange) this.config.onChange(); };
-                            img.src = re.target.result;
-                        }; reader.readAsDataURL(file);
+                        const tempUrl = createObjectUrl(file);
+                        const img = new Image();
+                        img.onload = async () => {
+                            this.data.imgWidth = img.width; this.data.imgHeight = img.height; this.data.mode = 'image'; this.data.isLocked = false; this.data.isDrawingActive = false;
+                            await this.persistBaseImage(file, tempUrl);
+                            this.render(); if(this.config.onChange) this.config.onChange();
+                        };
+                        img.onerror = () => revokeObjectUrl(tempUrl);
+                        img.src = tempUrl;
                     }
                 };
                 selector.append(mapBtn, photoBtn, blankBtn, fileInput); this.wrapper.appendChild(selector);
+            }
+            async hydrateBaseImage() {
+                if (this.baseImageUrl) return this.baseImageUrl;
+                if (!this.data.baseImageId) return '';
+                const blob = await mediaStore.getBlob(this.data.baseImageId);
+                if (blob) this.baseImageUrl = createObjectUrl(blob);
+                return this.baseImageUrl;
+            }
+            async persistBaseImage(blob, objectUrl = '') {
+                if (!blob) return;
+                const mediaId = this.data.baseImageId || crypto.randomUUID();
+                if (mediaStore.isAvailable) await mediaStore.saveBlob(mediaId, blob, 'image');
+                revokeObjectUrl(this.baseImageUrl);
+                this.data.baseImageId = mediaId;
+                this.baseImageUrl = objectUrl || createObjectUrl(blob);
             }
             buildControls() {
                 this.lockBtn = createEl('button', 'canvas-action-btn', { innerHTML: this.data.isLocked ? ICONS.lock : ICONS.unlock });
@@ -804,7 +1495,7 @@
             renderUniversalCanvas() {
                 if (this.map) { this.map.remove(); this.map = null; }
                 this.mediaContainer = createEl('div', 'leaflet-container'); this.relativeFrame.appendChild(this.mediaContainer);
-                setTimeout(() => {
+                setTimeout(async () => {
                     if (!this.mediaContainer.isConnected) return;
                     if (this.data.mode === 'map') {
                         this.map = L.map(this.mediaContainer, { zoomControl: false, attributionControl: false }).setView([this.data.lat, this.data.lng], this.data.zoom);
@@ -812,9 +1503,10 @@
                         L.tileLayer(tileUrl, { maxZoom: 20 }).addTo(this.map);
                     } else {
                         this.map = L.map(this.mediaContainer, { crs: L.CRS.Simple, zoomControl: false, attributionControl: false, minZoom: -4 });
-                        if (this.data.mode === 'image' && this.data.baseImage) {
+                        const imageUrl = this.data.mode === 'image' ? await this.hydrateBaseImage() : '';
+                        if (this.data.mode === 'image' && imageUrl) {
                             const bounds = [[0, 0], [this.data.imgHeight || 600, this.data.imgWidth || 800]];
-                            L.imageOverlay(this.data.baseImage, bounds).addTo(this.map);
+                            L.imageOverlay(imageUrl, bounds).addTo(this.map);
                             if (!this.data.hasInitializedView && !this.readOnly) { this.map.fitBounds(bounds); this.data.hasInitializedView = true; if(this.config.onChange) this.config.onChange(); } 
                             else { this.map.setView([this.data.lat, this.data.lng], this.data.zoom); }
                         } else { this.map.setView([this.data.lat || 0, this.data.lng || 0], this.data.zoom || 0); }
@@ -862,8 +1554,11 @@
                     if (this.drawBtn) { this.drawBtn.style.display = 'flex'; if (this.data.isDrawingActive) { this.drawBtn.classList.add('active'); this.mediaContainer.classList.add('drawing-mode'); } else { this.drawBtn.classList.remove('active'); } }
                 }
             }
-            save() { if (this.map && this.data.mode) { const center = this.map.getCenter(); this.data.lat = center.lat; this.data.lng = center.lng; this.data.zoom = this.map.getZoom(); } return this.data; }
-            destroy() { if (this.map) { this.map.remove(); this.map = null; } }
+            save() {
+                if (this.map && this.data.mode) { const center = this.map.getCenter(); this.data.lat = center.lat; this.data.lng = center.lng; this.data.zoom = this.map.getZoom(); }
+                return { mode: this.data.mode, title: this.data.title, lat: this.data.lat, lng: this.data.lng, zoom: this.data.zoom, isLocked: this.data.isLocked, baseImageId: this.data.baseImageId, imgWidth: this.data.imgWidth, imgHeight: this.data.imgHeight, hasInitializedView: this.data.hasInitializedView, lines: this.data.lines, isDrawingActive: this.data.isDrawingActive };
+            }
+            destroy() { if (this.map) { this.map.remove(); this.map = null; } revokeObjectUrl(this.baseImageUrl); this.baseImageUrl = ''; }
         }
 
         class CalendarTool {
@@ -913,52 +1608,82 @@
             static get toolbox() { return { title: 'Voice Memo', icon: ICONS.mic }; }
             constructor({data, config, api, readOnly}) {
                 this.api = api; this.config = config; this.readOnly = readOnly; 
-                this.data = { url: data.url || null, title: data.title || '' };
+                this.data = { mediaId: data.mediaId || null, title: data.title || '' };
                 this.recorder = null; this.chunks = []; this.isPlaying = false; this.isRecording = false;
-                this.nodes = { wrapper: createEl('div', 'voice-tool-container'), button: createEl('button', 'v-memo__btn'), title: createEl('input', 'v-memo__title', { type: 'text', value: this.data.title, placeholder: 'Name this memo...' }), status: createEl('div', 'v-memo__status'), audio: createEl('audio', '', { style: 'display: none;', src: this.data.url || '' }) };
+                this.objectUrl = '';
+                this.nodes = { wrapper: createEl('div', 'voice-tool-container'), button: createEl('button', 'v-memo__btn'), title: createEl('input', 'v-memo__title', { type: 'text', value: this.data.title, placeholder: 'Name this memo...' }), status: createEl('div', 'v-memo__status'), audio: createEl('audio', '', { style: 'display: none;' }) };
                 if (this.readOnly) this.nodes.title.readOnly = true;
                 this.nodes.title.addEventListener('input', (e) => { this.data.title = e.target.value; if(this.config.onChange) this.config.onChange(); });
             }
             render() {
                 this.nodes.audio.onplay = () => { this.isPlaying = true; this.updateUI(); }; this.nodes.audio.onpause = () => { this.isPlaying = false; this.updateUI(); }; this.nodes.audio.onended = () => { this.isPlaying = false; this.updateUI(); };
                 this.nodes.button.onclick = () => this.handleAction();
+                void this.hydrateAudio();
                 this.nodes.wrapper.append(this.nodes.button, this.nodes.title, this.nodes.status, this.nodes.audio); this.updateUI(); return this.nodes.wrapper;
+            }
+            async hydrateAudio() {
+                if (this.objectUrl) return;
+                if (!this.data.mediaId) return;
+                const blob = await mediaStore.getBlob(this.data.mediaId);
+                if (!blob) return;
+                this.objectUrl = createObjectUrl(blob);
+                this.nodes.audio.src = this.objectUrl;
+                this.updateUI();
+            }
+            async persistAudioBlob(blob) {
+                if (!blob) return;
+                const mediaId = this.data.mediaId || crypto.randomUUID();
+                if (mediaStore.isAvailable) await mediaStore.saveBlob(mediaId, blob, 'audio');
+                revokeObjectUrl(this.objectUrl);
+                this.objectUrl = createObjectUrl(blob);
+                this.nodes.audio.src = this.objectUrl;
+                this.data.mediaId = mediaId;
+                this.updateUI();
             }
             updateUI() {
                 this.nodes.button.className = 'v-memo__btn'; 
                 if (this.isPlaying) { this.nodes.button.innerHTML = ICONS.pause; this.nodes.status.innerText = 'Playing...'; this.nodes.button.classList.add('playing'); } 
-                else if (this.data.url) { this.nodes.button.innerHTML = ICONS.play; this.nodes.status.innerText = 'Ready'; } 
+                else if (this.data.mediaId || this.nodes.audio.src) { this.nodes.button.innerHTML = ICONS.play; this.nodes.status.innerText = 'Ready'; } 
                 else if (this.isRecording) { this.nodes.button.innerHTML = ICONS.stop; this.nodes.status.innerText = 'Recording...'; this.nodes.button.classList.add('recording'); } 
                 else if (this.readOnly) { this.nodes.button.style.display = 'none'; this.nodes.status.innerText = 'No audio'; }
                 else { this.nodes.button.innerHTML = ICONS.mic; this.nodes.status.innerText = 'Record'; }
             }
             async handleAction() {
-                if (this.readOnly && !this.data.url) return;
-                if (this.data.url) { this.isPlaying ? this.nodes.audio.pause() : this.nodes.audio.play(); } 
+                if (this.readOnly && !this.nodes.audio.src) return;
+                if (this.nodes.audio.src) { this.isPlaying ? this.nodes.audio.pause() : this.nodes.audio.play(); } 
                 else {
                     if (this.isRecording) { this.recorder.stop(); this.isRecording = false; this.nodes.status.innerText = 'Processing...'; } 
                     else {
                         try {
                             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                             this.recorder = new MediaRecorder(stream); this.chunks = []; this.recorder.ondataavailable = (e) => this.chunks.push(e.data);
-                            this.recorder.onstop = () => { const reader = new FileReader(); reader.onloadend = () => { this.data.url = reader.result; this.nodes.audio.src = this.data.url; this.updateUI(); if(this.config.onChange) this.config.onChange(); }; reader.readAsDataURL(new Blob(this.chunks, { type: 'audio/webm' })); stream.getTracks().forEach(track => track.stop()); };
+                            this.recorder.onstop = async () => { const blob = new Blob(this.chunks, { type: 'audio/webm' }); await this.persistAudioBlob(blob); if(this.config.onChange) this.config.onChange(); stream.getTracks().forEach(track => track.stop()); };
                             this.recorder.start(); this.isRecording = true; this.updateUI();
                         } catch (err) { this.nodes.status.innerText = 'Mic denied'; }
                     }
                 }
             }
-            destroy() { if (this.recorder && this.recorder.state !== 'inactive') this.recorder.stop(); if (this.recorder && this.recorder.stream) this.recorder.stream.getTracks().forEach(track => track.stop()); this.nodes.audio.pause(); }
-            save() { return this.data; }
+            destroy() { if (this.recorder && this.recorder.state !== 'inactive') this.recorder.stop(); if (this.recorder && this.recorder.stream) this.recorder.stream.getTracks().forEach(track => track.stop()); this.nodes.audio.pause(); revokeObjectUrl(this.objectUrl); this.objectUrl = ''; }
+            save() { return { mediaId: this.data.mediaId, title: this.data.title }; }
         }
 
         // ============================================================================
         // CORE APP LIFECYCLE & ASYNC STORAGE QUEUE
         // ============================================================================
         window.editor = null; 
-        let timestamps = {}, updateRaf, saveTimeout;
+        let timestamps = {}, blockAuthors = {}, updateRaf, saveTimeout;
         let isSaving = false, hasPendingSave = false;
         let todayStr = getLocalYYYYMMDD(new Date());
         window.currentDateStr = todayStr;
+
+        function setBlockAuthor(blockId, author) {
+            if (!blockId || !author) return;
+            blockAuthors[blockId] = author;
+        }
+
+        function getBlockAuthor(blockId) {
+            return blockAuthors[blockId] || 'user';
+        }
 
         function getDisplayDate(dateStr) {
             const [y, m, d] = dateStr.split('-'); const date = new Date(y, m - 1, d);
@@ -976,8 +1701,7 @@
             smartCanvas: { class: SmartCanvasTool, config: { onChange: () => scheduleSave() } },
             calendar: { class: CalendarTool, config: { onChange: () => scheduleSave() } },
             voice: { class: VoiceMemo, config: { onChange: () => scheduleSave() } },
-            recall: { class: RecallTool, config: { onChange: () => scheduleSave() } },
-            aiStream: { class: AIStreamBlock, config: { onChange: () => scheduleSave() } }
+            recall: { class: RecallTool, config: { onChange: () => scheduleSave() } }
         };
 
         const domObserver = new MutationObserver(() => { cancelAnimationFrame(updateRaf); updateRaf = requestAnimationFrame(updateAllTimestamps); });
@@ -987,11 +1711,14 @@
                 const id = block.getAttribute('data-id'); if (!id) return;
                 let timeEl = block.querySelector('.ce-block-time');
                 if (!timeEl) { timeEl = createEl('div', 'ce-block-time'); block.appendChild(timeEl); }
-                if (timestamps[id]) { timeEl.textContent = new Date(timestamps[id]).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); } 
-                else if (window.currentDateStr === todayStr && window.editor) {
-                    timestamps[id] = Date.now(); timeEl.textContent = new Date(timestamps[id]).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+                if (!blockAuthors[id] && window.currentDateStr === todayStr) setBlockAuthor(id, 'user');
+                if (!timestamps[id] && window.currentDateStr === todayStr && window.editor) {
+                    timestamps[id] = Date.now();
                     scheduleSave(); 
                 }
+                timeEl.innerHTML = '';
+                timeEl.append(createEl('span', `ce-block-author ${getBlockAuthor(id) === 'ai' ? 'ai' : 'user'}`, { textContent: getAuthorLabel(getBlockAuthor(id)) }));
+                if (timestamps[id]) timeEl.append(createEl('span', '', { textContent: new Date(timestamps[id]).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) }));
             });
         }
 
@@ -1000,10 +1727,14 @@
             if (!window.editor || window.currentDateStr !== todayStr) { isSaving = false; hasPendingSave = false; return; }
             
             isSaving = true;
+            let savedSnapshot = null;
             window.editor.save().then(outputData => {
                 outputData.timestamps = timestamps;
+                outputData.authors = blockAuthors;
+                savedSnapshot = outputData;
                 return appDB.save(window.currentDateStr, outputData);
             }).then(() => {
+                if (savedSnapshot) vectorDB.scheduleIndexDay(window.currentDateStr, savedSnapshot);
                 const indicator = document.getElementById('save-indicator');
                 if (indicator && !appDB.isMemoryOnly) {
                     indicator.classList.add('visible');
@@ -1063,10 +1794,7 @@
 
                     const prompt = text.substring(trigger.length).trim();
                     if (!prompt) return;
-                    if (!aiEngine) { alert(`${CONFIG.AI_NAME} is still booting. Please wait a moment.`); return; }
-
-                    window.editor.blocks.insert('aiStream', { prompt: prompt }, {}, activeIndex, true);
-                    window.editor.blocks.delete(activeIndex + 1);
+                    void insertAIReplyAfterPrompt(activeIndex, prompt);
                 }
             }
         }, true);
@@ -1085,13 +1813,14 @@
             const isToday = date === todayStr;
             let cachedData = appDB.cache[date];
             // Shallow clone structure, prevent direct array mutations on load
-            let editorData = cachedData ? { blocks: [...cachedData.blocks], timestamps: {...cachedData.timestamps} } : { blocks: [] };
+            let editorData = cachedData ? { blocks: [...cachedData.blocks], timestamps: {...cachedData.timestamps}, authors: {...cachedData.authors} } : { blocks: [] };
             
             if (isToday && (!editorData.blocks || editorData.blocks.length === 0)) {
                 editorData = { blocks: [{ type: "paragraph", data: { text: `Type '@${CONFIG.AI_NAME} [prompt]' and hit Enter...` } }] };
             }
 
             timestamps = editorData.timestamps || {};
+            blockAuthors = editorData.authors || {};
             document.getElementById('editorjs').innerHTML = '';
 
             window.editor = new EditorJS({
@@ -1106,7 +1835,10 @@
         }
 
         // Initialize app, respecting private mode limitations
-        appDB.init().then(() => { initEditor(window.currentDateStr); });
+        Promise.all([appDB.init(), vectorDB.init(), mediaStore.init()]).then(() => {
+            initEditor(window.currentDateStr);
+            vectorDB.ensureBackfill(appDB.cache);
+        });
 
     </script>
 </body>
