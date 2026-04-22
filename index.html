@@ -2003,7 +2003,6 @@ CRITICAL INSTRUCTIONS:
         // ============================================================================
         window.isRefPage = false;
         window.currentRefSlug = null;
-        let hasBooted = false; // Flag to prevent initial load from overwriting db with empty DOM
 
         const scheduleSave = debounce(async (immediate = false) => {
             if (!(CONFIG.DEV_ALLOW_PAST_EDITING || window.currentDateStr === todayStr || window.isRefPage)) return;
@@ -2024,17 +2023,6 @@ CRITICAL INSTRUCTIONS:
                 }
             }
         }, 800);
-
-        // Instantly save to local storage when closing the tab or switching apps on mobile
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden' && isEditable() && hasBooted) {
-                const data = editor.save();
-                localStorage.setItem(`infinotes_backup_${window.currentDateStr}`, JSON.stringify(data));
-                if (pgDB.isReady) {
-                    pgDB.saveNote(window.currentDateStr, data).catch(() => {});
-                }
-            }
-        });
 
         function renderDateHeader() {
             const headerEl = document.getElementById('date-header');
@@ -2075,12 +2063,7 @@ CRITICAL INSTRUCTIONS:
         }
 
         async function loadDay(dateStr) {
-            // Only auto-save the previous view if the app has fully booted and hydrated first
-            if (hasBooted && pgDB.isReady && isEditable() && window.currentDateStr !== dateStr) { 
-                try { await pgDB.saveNote(window.currentDateStr, editor.save()); } catch(e) {} 
-            }
-            
-            hasBooted = true;
+            if (pgDB.isReady && isEditable()) { try { await pgDB.saveNote(window.currentDateStr, editor.save()); } catch(e) {} }
             window.isRefPage = false; window.currentRefSlug = null; window.currentDateStr = dateStr;
             renderDateHeader(); removeBacklinksSection();
             
@@ -2094,13 +2077,8 @@ CRITICAL INSTRUCTIONS:
         }
 
         async function loadRefPage(slug) {
-            const targetStr = `ref::${slug}`;
-            if (hasBooted && pgDB.isReady && isEditable() && window.currentDateStr !== targetStr) { 
-                try { await pgDB.saveNote(window.currentDateStr, editor.save()); } catch(e) {} 
-            }
-            
-            hasBooted = true;
-            window.isRefPage = true; window.currentRefSlug = slug; window.currentDateStr = targetStr;
+            if (pgDB.isReady) { try { await pgDB.saveNote(window.currentDateStr, editor.save()); } catch(e) {} }
+            window.isRefPage = true; window.currentRefSlug = slug; window.currentDateStr = `ref::${slug}`;
             renderDateHeader();
             editor.load((pgDB.cache[`ref::${slug}`] || { blocks: [] }).blocks);
             renderBacklinksSection(slug);
