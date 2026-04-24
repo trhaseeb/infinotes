@@ -302,7 +302,7 @@
         // ============================================================================
         // ⚙️ SYSTEM UTILS & HELPERS
         // ============================================================================
-        const CONFIG = { DEV_ALLOW_PAST_EDITING: true, AI_SETTINGS_KEY: 'infinotes_ai_settings_v1' };
+        const CONFIG = { DEV_ALLOW_PAST_EDITING: true, AI_SETTINGS_KEY: 'infinotes_ai_settings_v1', EMBEDDING_MODEL_ID: 'Xenova/all-MiniLM-L6-v2' };
         const AI_PROVIDER_PRESETS = {
             openai: {
                 label: 'ChatGPT / OpenAI',
@@ -390,24 +390,93 @@
             cancel: function (id) { if (this.timers.has(id)) { clearTimeout(this.timers.get(id)); this.timers.delete(id); } }
         };
 
+        const VectorEmbedder = new (class {
+            constructor() {
+                this.embedder = null;
+                this.promise = null;
+            }
+            fallbackEmbedding(text) {
+                const normalized = normalizePlainText(text).toLowerCase();
+                const vector = new Array(384).fill(0);
+                const tokens = normalized.split(/\s+/).filter(Boolean);
+                const grams = [];
+                tokens.forEach(token => {
+                    grams.push(token);
+                    if (token.length > 2) {
+                        for (let index = 0; index <= token.length - 3; index += 1) grams.push(token.slice(index, index + 3));
+                    }
+                });
+                const parts = grams.length ? grams : [normalized];
+                parts.forEach((part, partIndex) => {
+                    let hash = 2166136261;
+                    for (let index = 0; index < part.length; index += 1) {
+                        hash ^= part.charCodeAt(index);
+                        hash = Math.imul(hash, 16777619);
+                    }
+                    const dimension = Math.abs(hash % vector.length);
+                    const sign = ((hash >>> 1) & 1) === 0 ? 1 : -1;
+                    vector[dimension] += sign * (1 + (partIndex % 7) * 0.05);
+                });
+                const magnitude = Math.hypot(...vector) || 1;
+                return vector.map(value => value / magnitude);
+            }
+            async getEmbedder() {
+                if (this.embedder) return this.embedder;
+                if (!this.promise) {
+                    this.promise = import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0-alpha.19/+esm').then(async ({ pipeline, env }) => {
+                        env.allowRemoteModels = true;
+                        env.useBrowserCache = true;
+                        if (env.backends?.onnx) env.backends.onnx.logLevel = 'fatal';
+                        try {
+                            this.embedder = await pipeline('feature-extraction', CONFIG.EMBEDDING_MODEL_ID, { device: 'webgpu' });
+                        } catch {
+                            this.embedder = await pipeline('feature-extraction', CONFIG.EMBEDDING_MODEL_ID, { device: 'wasm', dtype: 'q8' });
+                        }
+                        return this.embedder;
+                    });
+                }
+                return this.promise;
+            }
+            async embedText(text) {
+                const normalized = normalizePlainText(text).slice(0, 1200);
+                if (!normalized) return null;
+                try {
+                    const pipe = await this.getEmbedder();
+                    const output = await pipe(normalized, { pooling: 'mean', normalize: true });
+                    const list = typeof output.tolist === 'function' ? output.tolist() : Array.from(output.data);
+                    return Array.isArray(list[0]) ? list[0] : list;
+                } catch {
+                    return this.fallbackEmbedding(normalized);
+                }
+            }
+        })();
+
         // ============================================================================
         // 💾 ROBUST STORAGE ARCHITECTURE
         // ============================================================================
         class PGLiteDatabase {
-            constructor() { this.pg = null; this.cache = {}; this.isReady = false; }
+            constructor() { this.pg = null; this.cache = {}; this.isReady = false; this.vectorReady = false; this.pendingDays = new Set(); }
             async init() {
                 const statusEl = document.getElementById('db-status');
                 try {
-                    const { PGlite } = await import("https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/index.js");
-                    this.pg = await PGlite.create({ dataDir: 'idb://infinotes-v2' });
+                    const [{ PGlite }, { vector }] = await Promise.all([
+                        import("https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/index.js"),
+                        import("https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/vector/index.js")
+                    ]);
+                    this.pg = await PGlite.create({ dataDir: 'idb://infinotes-v2', extensions: { vector } });
                     await this.pg.exec(`
+                        CREATE EXTENSION IF NOT EXISTS vector;
                         CREATE TABLE IF NOT EXISTS daily_notes (date_str TEXT PRIMARY KEY, data JSONB);
+                        CREATE TABLE IF NOT EXISTS semantic_index (key TEXT PRIMARY KEY, date_str TEXT, block_id TEXT, block_type TEXT, search_text TEXT, embedding vector(384), timestamp BIGINT);
                         CREATE TABLE IF NOT EXISTS personas_list (slug TEXT PRIMARY KEY, display_name TEXT NOT NULL, created_at BIGINT);
                     `);
                     await this.pg.query(`INSERT INTO personas_list (slug, display_name, created_at) VALUES ('me', 'me', $1) ON CONFLICT DO NOTHING`, [Date.now()]);
                     
+                    this.vectorReady = true;
                     this.isReady = true; statusEl.textContent = 'db.ready'; statusEl.className = 'neon-status db-status';
                     (await this.pg.query(`SELECT date_str, data FROM daily_notes`)).rows.forEach(r => this.cache[r.date_str] = typeof r.data === 'string' ? JSON.parse(r.data) : r.data);
+                    Object.keys(this.cache).filter(dateStr => !dateStr.startsWith('persona::')).forEach(dateStr => this.pendingDays.add(dateStr));
+                    this.startBackgroundIndexer();
                 } catch (e) {
                     statusEl.textContent = 'db.offline [memory mode]'; statusEl.className = 'neon-status db-status error';
                 }
@@ -416,9 +485,15 @@
                 this.cache[dateStr] = data; localStorage.setItem(`infinotes_backup_${dateStr}`, JSON.stringify(data));
                 if (!this.isReady) throw new Error("Offline");
                 await this.pg.query(`INSERT INTO daily_notes (date_str, data) VALUES ($1, $2) ON CONFLICT (date_str) DO UPDATE SET data = EXCLUDED.data`, [dateStr, JSON.stringify(data)]);
+                if (!dateStr.startsWith('persona::')) this.pendingDays.add(dateStr);
             }
             async getPersonas() { return this.isReady ? (await this.pg.query(`SELECT slug, display_name, created_at FROM personas_list ORDER BY created_at DESC`)).rows : []; }
             async createPersona(slug, displayName) { if (this.isReady) await this.pg.query(`INSERT INTO personas_list (slug, display_name, created_at) VALUES ($1, $2, $3) ON CONFLICT (slug) DO NOTHING`, [slug, displayName, Date.now()]); }
+            extractSearchText(block) {
+                if (!block) return '';
+                if (['text', 'h1', 'h2', 'h3', 'quote', 'ul', 'ol', 'todo', 'todo-checked'].includes(block.type)) return normalizePlainText(block.data?.text);
+                return normalizePlainText(JSON.stringify(block.data));
+            }
             findBacklinks(slug) {
                 const res = [], search = `data-slug="${slug}"`;
                 for (const [key, data] of Object.entries(this.cache)) {
@@ -431,7 +506,36 @@
                 }
                 return res.sort((a, b) => b.dateStr.localeCompare(a.dateStr));
             }
-            async searchNotes(queryText, excludeDate, limit = 5) {
+            startBackgroundIndexer() {
+                setInterval(async () => {
+                    if (!this.isReady || !this.vectorReady || !this.pendingDays.size) return;
+                    const dateStr = [...this.pendingDays][0];
+                    this.pendingDays.delete(dateStr);
+                    const dayData = this.cache[dateStr];
+                    if (!dayData?.blocks) return;
+                    try {
+                        await this.pg.query(`DELETE FROM semantic_index WHERE date_str = $1`, [dateStr]);
+                        for (const block of dayData.blocks) {
+                            const searchText = this.extractSearchText(block);
+                            if (!searchText) continue;
+                            const embedding = await VectorEmbedder.embedText(searchText);
+                            if (!embedding) continue;
+                            await this.pg.query(`INSERT INTO semantic_index (key, date_str, block_id, block_type, search_text, embedding, timestamp) VALUES ($1, $2, $3, $4, $5, $6::vector, $7)`, [
+                                `${dateStr}::${block.id}`,
+                                dateStr,
+                                block.id,
+                                block.type,
+                                searchText,
+                                `[${embedding.join(',')}]`,
+                                block.timestamp || Date.now()
+                            ]);
+                        }
+                    } catch {
+                        this.vectorReady = false;
+                    }
+                }, 4000);
+            }
+            async searchNotesLexical(queryText, excludeDate, limit = 5) {
                 const normalizedQuery = normalizePlainText(queryText).toLowerCase();
                 if (!normalizedQuery) return [];
                 const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
@@ -439,9 +543,7 @@
                 for (const [dateStr, data] of Object.entries(this.cache)) {
                     if (dateStr === excludeDate || dateStr.startsWith('persona::') || !data?.blocks) continue;
                     for (const block of data.blocks) {
-                        const searchText = ['text', 'h1', 'h2', 'h3', 'quote', 'ul', 'ol', 'todo', 'todo-checked'].includes(block.type)
-                            ? normalizePlainText(block.data?.text)
-                            : normalizePlainText(JSON.stringify(block.data));
+                        const searchText = this.extractSearchText(block);
                         if (!searchText) continue;
                         const haystack = searchText.toLowerCase();
                         const exactMatch = haystack.includes(normalizedQuery);
@@ -458,6 +560,20 @@
                     }
                 }
                 return matches.sort((a, b) => b.score - a.score || b.timestamp - a.timestamp).slice(0, limit);
+            }
+            async searchNotes(queryText, excludeDate, limit = 5) {
+                if (this.isReady && this.vectorReady) {
+                    try {
+                        const embedding = await VectorEmbedder.embedText(queryText);
+                        if (embedding) {
+                            const result = await this.pg.query(`SELECT date_str as date, block_id as "blockId", block_type as type, search_text as "searchText", timestamp, 1 - (embedding <=> $1::vector) AS score FROM semantic_index WHERE date_str != $2 ORDER BY embedding <=> $1::vector ASC LIMIT $3`, [`[${embedding.join(',')}]`, excludeDate || '', limit]);
+                            if (result.rows?.length) return result.rows;
+                        }
+                    } catch {
+                        this.vectorReady = false;
+                    }
+                }
+                return this.searchNotesLexical(queryText, excludeDate, limit);
             }
         }
 
@@ -478,6 +594,7 @@
         }
 
         const pgDB = new PGLiteDatabase(); const mediaStore = new MediaBlobStore();
+        window.pgDB = pgDB; window.mediaStore = mediaStore;
 
         // ============================================================================
         // 🤖 REMOTE STREAMING AI
@@ -1709,6 +1826,7 @@
                 for (const mention of aiMentions) {
                     const { slug, name } = mention;
                     const aiInstructions = pgDB.cache[`persona::${slug}`]?.blocks?.map(b => normalizePlainText(b.data?.text)).join('\n') || '';
+                    const systemPrompt = [meContext, aiInstructions, topicalContext].filter(Boolean).join('\n\n').trim();
                     
                     const aiBlock = this.addBasicBlock('text', `<span class="neon-status ai-status loading">${name} streaming...</span>`, slug, crypto.randomUUID(), Date.now(), lastInsertId);
                     const aiContent = aiBlock.dom.querySelector('.text-content');
@@ -1720,7 +1838,7 @@
                         updateAIStatus('loading');
                         aiContent.innerHTML = '';
                         await AIService.streamCompletion({
-                            systemPrompt: `You are embodying the persona, topic, or knowledge base of "${name}".\n[Global User Context (@me)]:\n${meContext || 'None'}\n\n[Your Core Knowledge & Instructions]:\n${aiInstructions || `You have no specific notes. Act as a helpful expert on ${name}.`}\n\n[Relevant Past Notes]:\n${topicalContext || 'None'}\n\nCRITICAL INSTRUCTIONS:\n1. Respond directly and concisely.\n2. DO NOT prefix your response with your name.\n3. Embody the knowledge of "${name}".`,
+                            systemPrompt,
                             userPrompt,
                             onDelta: (chunk) => {
                                 aiText += chunk;
