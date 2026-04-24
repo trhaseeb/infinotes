@@ -79,7 +79,7 @@
         .status-row { display: flex; align-items: center; gap: 16px; user-select: none; flex-wrap: wrap; }
         .neon-status { font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: lowercase; }
         
-        .ai-status { color: var(--neon-purple); opacity: 0.8; transition: opacity 0.3s ease; }
+        .ai-status { color: var(--neon-purple); opacity: 0.8; transition: opacity 0.3s ease; cursor: pointer; }
         .ai-status.loading { animation: neon-pulse 1.5s infinite ease-in-out; }
         .ai-status.error { color: #ef4444; opacity: 1; }
 
@@ -202,6 +202,23 @@
         .time-row::-webkit-scrollbar { display: none; }
         .time-row .raw-btn { flex: 0 0 auto; scroll-snap-align: center; border-radius: 20px; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.15); }
         .time-row .raw-btn:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.15); }
+        .whiteboard-shell { display: flex; flex-direction: column; gap: 12px; }
+        .whiteboard-stage { position: relative; width: 100%; min-height: 320px; background: repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(0, 0, 0, 0.05) 28px), repeating-linear-gradient(90deg, transparent, transparent 27px, rgba(0, 0, 0, 0.05) 28px), var(--bg-color); border: 2px solid var(--text-color); overflow: hidden; touch-action: none; }
+        .whiteboard-canvas { display: block; width: 100%; height: 360px; cursor: crosshair; }
+        .whiteboard-readonly .whiteboard-canvas { cursor: default; }
+        .image-stage { margin-top: 8px; border: 2px solid var(--text-color); background: var(--baritone-bg); overflow: hidden; }
+        .image-view { display: block; width: 100%; height: auto; max-height: 70vh; object-fit: contain; }
+
+        .ai-settings-modal { position: fixed; inset: 0; background: var(--bg-color-transparent); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 10001; display: none; justify-content: center; align-items: center; padding: 20px; }
+        .ai-settings-modal.active { display: flex; }
+        .ai-settings-panel { background: var(--bg-color); width: min(100%, 520px); padding: 24px; border: 2px solid var(--text-color); box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.15); display: flex; flex-direction: column; gap: 16px; max-height: 90vh; overflow-y: auto; }
+        .ai-settings-copy { font-family: var(--font-mono); font-size: 11px; line-height: 1.6; color: var(--muted-text); text-transform: uppercase; }
+        .ai-settings-grid { display: grid; gap: 12px; }
+        .ai-settings-label { display: flex; flex-direction: column; gap: 6px; font-family: var(--font-mono); font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted-text); }
+        .ai-settings-input, .ai-settings-select { width: 100%; background: transparent; border: 2px solid var(--text-color); color: var(--text-color); padding: 12px; font-family: var(--font-main); font-size: 16px; outline: none; }
+        .ai-settings-input::placeholder { color: var(--muted-text); }
+        .ai-settings-hint { font-family: var(--font-mono); font-size: 11px; line-height: 1.5; color: var(--muted-text); }
+        .ai-settings-actions { display: flex; gap: 12px; flex-wrap: wrap; }
     </style>
 </head>
 
@@ -242,13 +259,82 @@
         </div>
     </div>
 
+    <div id="ai-settings-modal" class="ai-settings-modal">
+        <div class="ai-settings-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+                <div style="font-size: 20px; font-weight: 900; font-style: italic; text-transform: uppercase; font-family: var(--font-main);">AI Routing</div>
+                <button id="ai-settings-close" class="raw-btn">Close</button>
+            </div>
+            <div class="ai-settings-copy">Remote AI only. Keys stay in this browser via localStorage, so this is suitable for personal use or a proxy you control.</div>
+            <div class="ai-settings-grid">
+                <label class="ai-settings-label">
+                    Provider
+                    <select id="ai-provider-select" class="ai-settings-select">
+                        <option value="openai">ChatGPT / OpenAI</option>
+                        <option value="anthropic">Claude / Anthropic</option>
+                        <option value="gemini">Gemini / Google</option>
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="custom">OpenAI-Compatible</option>
+                    </select>
+                </label>
+                <label class="ai-settings-label">
+                    Model
+                    <input id="ai-model-input" class="ai-settings-input" type="text" placeholder="gpt-4.1-mini">
+                </label>
+                <label class="ai-settings-label">
+                    API Key
+                    <input id="ai-key-input" class="ai-settings-input" type="password" placeholder="Paste API key">
+                </label>
+                <label id="ai-base-url-label" class="ai-settings-label" style="display: none;">
+                    Base URL
+                    <input id="ai-base-url-input" class="ai-settings-input" type="url" placeholder="https://api.openai.com/v1/chat/completions">
+                </label>
+                <div id="ai-settings-hint" class="ai-settings-hint"></div>
+            </div>
+            <div class="ai-settings-actions">
+                <button id="ai-settings-save" class="raw-btn active">Save</button>
+                <button id="ai-settings-clear" class="raw-btn">Clear Key</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         // ============================================================================
         // ⚙️ SYSTEM UTILS & HELPERS
         // ============================================================================
-        const CONFIG = { EMBEDDING_MODEL_ID: "Xenova/all-MiniLM-L6-v2", DEV_ALLOW_PAST_EDITING: true };
+        const CONFIG = { DEV_ALLOW_PAST_EDITING: true, AI_SETTINGS_KEY: 'infinotes_ai_settings_v1' };
+        const AI_PROVIDER_PRESETS = {
+            openai: {
+                label: 'ChatGPT / OpenAI',
+                defaultModel: 'gpt-4.1-mini',
+                hint: 'Uses the OpenAI chat completions streaming API directly from the browser.'
+            },
+            anthropic: {
+                label: 'Claude / Anthropic',
+                defaultModel: 'claude-3-7-sonnet-latest',
+                hint: 'Uses the Anthropic messages streaming API. Browser-side keys depend on your Anthropic account policy.'
+            },
+            gemini: {
+                label: 'Gemini / Google',
+                defaultModel: 'gemini-2.5-flash',
+                hint: 'Uses Google Gemini streaming via SSE with your API key appended to the request URL.'
+            },
+            openrouter: {
+                label: 'OpenRouter',
+                defaultModel: 'openai/gpt-4.1-mini',
+                hint: 'Uses OpenRouter’s OpenAI-compatible streaming endpoint.'
+            },
+            custom: {
+                label: 'OpenAI-Compatible',
+                defaultModel: 'gpt-4.1-mini',
+                baseUrl: 'https://api.openai.com/v1/chat/completions',
+                hint: 'Use this for an OpenAI-compatible proxy or self-hosted endpoint.'
+            }
+        };
         const SLASH_COMMANDS = [
-            { id: 'smartCanvas', label: 'Canvas', sub: 'Draw & Map' },
+            { id: 'map', label: 'Map', sub: 'Pan & Zoom' },
+            { id: 'image', label: 'Image', sub: 'Place & Inspect' },
+            { id: 'whiteboard', label: 'Whiteboard', sub: 'Sketch Freely' },
             { id: 'voice', label: 'Voice', sub: 'Audio Memo' },
             { id: 'scan', label: 'Scan', sub: 'Image to Text' },
             { id: 'calendar', label: 'Event', sub: 'Schedule & Recurring' },
@@ -305,55 +391,23 @@
         };
 
         // ============================================================================
-        // 🧠 VECTOR EMBEDDING ENGINE (Transformers.js)
-        // ============================================================================
-        const VectorEmbedder = new (class {
-            constructor() { this.embedder = null; this.promise = null; }
-            async getEmbedder() {
-                if (this.embedder) return this.embedder;
-                if (!this.promise) {
-                    this.promise = import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0-alpha.19/+esm').then(async ({ pipeline, env }) => {
-                        env.allowRemoteModels = true; env.useBrowserCache = true;
-                        if (env.backends?.onnx) env.backends.onnx.logLevel = 'fatal';
-                        try { this.embedder = await pipeline('feature-extraction', CONFIG.EMBEDDING_MODEL_ID, { device: 'webgpu' }); }
-                        catch { this.embedder = await pipeline('feature-extraction', CONFIG.EMBEDDING_MODEL_ID, { dtype: 'q8' }); }
-                        return this.embedder;
-                    });
-                }
-                return this.promise;
-            }
-            async embedText(text) {
-                const n = normalizePlainText(text).slice(0, 1200); if (!n) return null;
-                try {
-                    const pipe = await this.getEmbedder();
-                    const out = await pipe(n, { pooling: 'mean', normalize: true });
-                    const list = typeof out.tolist === 'function' ? out.tolist() : Array.from(out.data);
-                    return Array.isArray(list[0]) ? list[0] : list;
-                } catch { return null; }
-            }
-        })();
-
-        // ============================================================================
         // 💾 ROBUST STORAGE ARCHITECTURE
         // ============================================================================
         class PGLiteDatabase {
-            constructor() { this.pg = null; this.cache = {}; this.isReady = false; this.pendingDays = new Set(); }
+            constructor() { this.pg = null; this.cache = {}; this.isReady = false; }
             async init() {
                 const statusEl = document.getElementById('db-status');
                 try {
-                    const [{ PGlite }, { vector }] = await Promise.all([ import("https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/index.js"), import("https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/vector/index.js") ]);
-                    this.pg = await PGlite.create({ dataDir: 'idb://infinotes-v2', extensions: { vector } });
+                    const { PGlite } = await import("https://cdn.jsdelivr.net/npm/@electric-sql/pglite/dist/index.js");
+                    this.pg = await PGlite.create({ dataDir: 'idb://infinotes-v2' });
                     await this.pg.exec(`
-                        CREATE EXTENSION IF NOT EXISTS vector;
                         CREATE TABLE IF NOT EXISTS daily_notes (date_str TEXT PRIMARY KEY, data JSONB);
-                        CREATE TABLE IF NOT EXISTS semantic_index (key TEXT PRIMARY KEY, date_str TEXT, block_id TEXT, block_type TEXT, search_text TEXT, embedding vector(384), timestamp BIGINT);
                         CREATE TABLE IF NOT EXISTS personas_list (slug TEXT PRIMARY KEY, display_name TEXT NOT NULL, created_at BIGINT);
                     `);
                     await this.pg.query(`INSERT INTO personas_list (slug, display_name, created_at) VALUES ('me', 'me', $1) ON CONFLICT DO NOTHING`, [Date.now()]);
                     
                     this.isReady = true; statusEl.textContent = 'db.ready'; statusEl.className = 'neon-status db-status';
                     (await this.pg.query(`SELECT date_str, data FROM daily_notes`)).rows.forEach(r => this.cache[r.date_str] = typeof r.data === 'string' ? JSON.parse(r.data) : r.data);
-                    this.startBackgroundIndexer();
                 } catch (e) {
                     statusEl.textContent = 'db.offline [memory mode]'; statusEl.className = 'neon-status db-status error';
                 }
@@ -362,7 +416,6 @@
                 this.cache[dateStr] = data; localStorage.setItem(`infinotes_backup_${dateStr}`, JSON.stringify(data));
                 if (!this.isReady) throw new Error("Offline");
                 await this.pg.query(`INSERT INTO daily_notes (date_str, data) VALUES ($1, $2) ON CONFLICT (date_str) DO UPDATE SET data = EXCLUDED.data`, [dateStr, JSON.stringify(data)]);
-                this.pendingDays.add(dateStr);
             }
             async getPersonas() { return this.isReady ? (await this.pg.query(`SELECT slug, display_name, created_at FROM personas_list ORDER BY created_at DESC`)).rows : []; }
             async createPersona(slug, displayName) { if (this.isReady) await this.pg.query(`INSERT INTO personas_list (slug, display_name, created_at) VALUES ($1, $2, $3) ON CONFLICT (slug) DO NOTHING`, [slug, displayName, Date.now()]); }
@@ -378,26 +431,33 @@
                 }
                 return res.sort((a, b) => b.dateStr.localeCompare(a.dateStr));
             }
-            startBackgroundIndexer() {
-                setInterval(async () => {
-                    if (!this.isReady || !this.pendingDays.size) return;
-                    const dateStr = [...this.pendingDays][0]; this.pendingDays.delete(dateStr);
-                    const dayData = this.cache[dateStr]; if (!dayData?.blocks) return;
-                    try {
-                        await this.pg.query(`DELETE FROM semantic_index WHERE date_str = $1`, [dateStr]);
-                        for (const b of dayData.blocks) {
-                            const txt = ['text', 'h1', 'h2', 'h3'].includes(b.type) ? normalizePlainText(b.data?.text) : normalizePlainText(JSON.stringify(b.data));
-                            if (!txt) continue;
-                            const vec = await VectorEmbedder.embedText(txt); if (!vec) continue;
-                            await this.pg.query(`INSERT INTO semantic_index (key, date_str, block_id, block_type, search_text, embedding, timestamp) VALUES ($1, $2, $3, $4, $5, $6::vector, $7)`, [`${dateStr}::${b.id}`, dateStr, b.id, b.type, txt, `[${vec.join(',')}]`, b.timestamp || Date.now()]);
-                        }
-                    } catch (e) { console.warn("Indexer error:", e); }
-                }, 5000);
-            }
-            async searchSemantic(queryText, excludeDate, limit = 5) {
-                if (!this.isReady) return [];
-                const vec = await VectorEmbedder.embedText(queryText); if (!vec) return [];
-                return (await this.pg.query(`SELECT date_str as date, block_id as "blockId", block_type as type, search_text as "searchText", timestamp, 1 - (embedding <=> $1::vector) AS score FROM semantic_index WHERE date_str != $2 ORDER BY embedding <=> $1::vector ASC LIMIT $3`, [`[${vec.join(',')}]`, excludeDate || '', limit])).rows;
+            async searchNotes(queryText, excludeDate, limit = 5) {
+                const normalizedQuery = normalizePlainText(queryText).toLowerCase();
+                if (!normalizedQuery) return [];
+                const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+                const matches = [];
+                for (const [dateStr, data] of Object.entries(this.cache)) {
+                    if (dateStr === excludeDate || dateStr.startsWith('persona::') || !data?.blocks) continue;
+                    for (const block of data.blocks) {
+                        const searchText = ['text', 'h1', 'h2', 'h3', 'quote', 'ul', 'ol', 'todo', 'todo-checked'].includes(block.type)
+                            ? normalizePlainText(block.data?.text)
+                            : normalizePlainText(JSON.stringify(block.data));
+                        if (!searchText) continue;
+                        const haystack = searchText.toLowerCase();
+                        const exactMatch = haystack.includes(normalizedQuery);
+                        const tokenMatches = tokens.reduce((count, token) => count + (haystack.includes(token) ? 1 : 0), 0);
+                        if (!exactMatch && tokenMatches === 0) continue;
+                        matches.push({
+                            date: dateStr,
+                            blockId: block.id,
+                            type: block.type,
+                            searchText,
+                            timestamp: block.timestamp || 0,
+                            score: (exactMatch ? 100 : 0) + tokenMatches * 10 + Math.min(searchText.length, 200) / 200
+                        });
+                    }
+                }
+                return matches.sort((a, b) => b.score - a.score || b.timestamp - a.timestamp).slice(0, limit);
             }
         }
 
@@ -420,25 +480,254 @@
         const pgDB = new PGLiteDatabase(); const mediaStore = new MediaBlobStore();
 
         // ============================================================================
-        // 🤖 ON-DEVICE AI
+        // 🤖 REMOTE STREAMING AI
         // ============================================================================
-        const AI_MODEL_ID = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
-        let aiEngine = null, isAILoading = false;
         const aiStatusEl = document.getElementById('ai-inline-status');
+        const aiSettingsModal = document.getElementById('ai-settings-modal');
+        const aiProviderSelect = document.getElementById('ai-provider-select');
+        const aiModelInput = document.getElementById('ai-model-input');
+        const aiKeyInput = document.getElementById('ai-key-input');
+        const aiBaseUrlLabel = document.getElementById('ai-base-url-label');
+        const aiBaseUrlInput = document.getElementById('ai-base-url-input');
+        const aiSettingsHint = document.getElementById('ai-settings-hint');
+        let activeAIStreams = 0;
 
-        async function initializeAI() {
-            if (aiEngine || isAILoading) return; isAILoading = true;
+        function getStoredAISettings() {
             try {
-                if (!navigator.gpu) throw new Error("No WebGPU");
-                const { CreateMLCEngine } = await import("https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.82/+esm");
-                aiEngine = await CreateMLCEngine(AI_MODEL_ID, { initProgressCallback: p => aiStatusEl.textContent = `sys.ai.loading [${Math.round(p.progress * 100)}%]` });
-                aiStatusEl.className = 'neon-status ai-status'; aiStatusEl.textContent = `sys.ai.online`;
-            } catch (err) {
-                aiStatusEl.className = 'neon-status ai-status error';
-                aiStatusEl.textContent = err.message.includes("WebGPU") ? "gpu.access.denied" : "sys.ai.offline";
-            } finally { isAILoading = false; }
+                const parsed = JSON.parse(localStorage.getItem(CONFIG.AI_SETTINGS_KEY) || '{}');
+                const provider = AI_PROVIDER_PRESETS[parsed.provider] ? parsed.provider : 'openai';
+                const preset = AI_PROVIDER_PRESETS[provider];
+                return {
+                    provider,
+                    model: parsed.model || preset.defaultModel,
+                    apiKey: parsed.apiKey || '',
+                    baseUrl: parsed.baseUrl || preset.baseUrl || ''
+                };
+            } catch {
+                return { provider: 'openai', model: AI_PROVIDER_PRESETS.openai.defaultModel, apiKey: '', baseUrl: '' };
+            }
         }
-        setTimeout(initializeAI, 1500);
+
+        function saveAISettings(settings) {
+            localStorage.setItem(CONFIG.AI_SETTINGS_KEY, JSON.stringify(settings));
+        }
+
+        function updateAIStatus(state = 'idle', detail = '') {
+            const settings = getStoredAISettings();
+            const providerLabel = settings.provider === 'custom' ? 'custom' : settings.provider;
+            aiStatusEl.className = `neon-status ai-status${state === 'loading' ? ' loading' : ''}${state === 'error' ? ' error' : ''}`;
+            if (!settings.apiKey) aiStatusEl.textContent = 'sys.ai.remote.unset';
+            else if (state === 'loading') aiStatusEl.textContent = detail || `sys.ai.streaming [${providerLabel}]`;
+            else if (state === 'error') aiStatusEl.textContent = detail || 'sys.ai.remote.error';
+            else aiStatusEl.textContent = `sys.ai.remote.ready [${providerLabel}:${settings.model}]`;
+        }
+
+        function syncAISettingsForm() {
+            const settings = getStoredAISettings();
+            const preset = AI_PROVIDER_PRESETS[settings.provider];
+            aiProviderSelect.value = settings.provider;
+            aiModelInput.value = settings.model || preset.defaultModel;
+            aiKeyInput.value = settings.apiKey || '';
+            aiBaseUrlLabel.style.display = settings.provider === 'custom' ? 'flex' : 'none';
+            aiBaseUrlInput.value = settings.baseUrl || preset.baseUrl || '';
+            aiSettingsHint.textContent = preset.hint;
+        }
+
+        function openAISettingsModal() {
+            syncAISettingsForm();
+            aiSettingsModal.classList.add('active');
+        }
+
+        function closeAISettingsModal() {
+            aiSettingsModal.classList.remove('active');
+        }
+
+        async function readSSEStream(response, onEvent) {
+            if (!response.ok) {
+                let detail = '';
+                try { detail = await response.text(); } catch {}
+                throw new Error(detail || `HTTP ${response.status}`);
+            }
+            if (!response.body) throw new Error('Streaming not available in this browser');
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            while (true) {
+                const { value, done } = await reader.read();
+                buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+                const frames = buffer.split(/\n\n/);
+                buffer = frames.pop() || '';
+                for (const frame of frames) {
+                    const lines = frame.split(/\n/).filter(Boolean);
+                    let event = 'message';
+                    const dataLines = [];
+                    lines.forEach(line => {
+                        if (line.startsWith('event:')) event = line.slice(6).trim();
+                        if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+                    });
+                    if (!dataLines.length) continue;
+                    const data = dataLines.join('\n');
+                    await onEvent({ event, data });
+                }
+                if (done) break;
+            }
+            if (buffer.trim()) {
+                const lines = buffer.split(/\n/).filter(Boolean);
+                let event = 'message';
+                const dataLines = [];
+                lines.forEach(line => {
+                    if (line.startsWith('event:')) event = line.slice(6).trim();
+                    if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+                });
+                if (dataLines.length) await onEvent({ event, data: dataLines.join('\n') });
+            }
+        }
+
+        const AIService = {
+            getSettings() {
+                const settings = getStoredAISettings();
+                if (!settings.apiKey) throw new Error('Remote AI is not configured yet. Click the AI status to add an API key.');
+                return settings;
+            },
+            async streamCompletion({ systemPrompt, userPrompt, onDelta }) {
+                const settings = this.getSettings();
+                const messages = [{ role: 'user', content: userPrompt }];
+                switch (settings.provider) {
+                    case 'openai':
+                    case 'openrouter':
+                    case 'custom':
+                        return this.streamOpenAICompatible(settings, messages, systemPrompt, onDelta);
+                    case 'anthropic':
+                        return this.streamAnthropic(settings, messages, systemPrompt, onDelta);
+                    case 'gemini':
+                        return this.streamGemini(settings, messages, systemPrompt, onDelta);
+                    default:
+                        throw new Error('Unsupported AI provider');
+                }
+            },
+            async streamOpenAICompatible(settings, messages, systemPrompt, onDelta) {
+                const endpoint = settings.provider === 'openrouter'
+                    ? 'https://openrouter.ai/api/v1/chat/completions'
+                    : settings.baseUrl || 'https://api.openai.com/v1/chat/completions';
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${settings.apiKey}`
+                };
+                if (settings.provider === 'openrouter') headers['X-Title'] = 'Infinite Notes';
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        model: settings.model,
+                        stream: true,
+                        temperature: 0.7,
+                        max_tokens: 500,
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            ...messages
+                        ]
+                    })
+                });
+                await readSSEStream(response, async ({ data }) => {
+                    if (data === '[DONE]') return;
+                    const payload = JSON.parse(data);
+                    const delta = payload.choices?.[0]?.delta?.content;
+                    if (typeof delta === 'string' && delta) onDelta(delta);
+                    else if (Array.isArray(delta)) {
+                        delta.forEach(part => { if (part?.type === 'text' && part.text) onDelta(part.text); });
+                    }
+                });
+            },
+            async streamAnthropic(settings, messages, systemPrompt, onDelta) {
+                const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': settings.apiKey,
+                        'anthropic-version': '2023-06-01'
+                    },
+                    body: JSON.stringify({
+                        model: settings.model,
+                        max_tokens: 500,
+                        temperature: 0.7,
+                        system: systemPrompt,
+                        stream: true,
+                        messages
+                    })
+                });
+                await readSSEStream(response, async ({ data }) => {
+                    if (!data || data === '[DONE]') return;
+                    const payload = JSON.parse(data);
+                    const delta = payload.delta?.text || payload.content_block?.text || '';
+                    if (delta) onDelta(delta);
+                });
+            },
+            async streamGemini(settings, messages, systemPrompt, onDelta) {
+                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(settings.model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(settings.apiKey)}`;
+                let aggregated = '';
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        systemInstruction: { parts: [{ text: systemPrompt }] },
+                        contents: messages.map(message => ({
+                            role: message.role === 'assistant' ? 'model' : 'user',
+                            parts: [{ text: message.content }]
+                        })),
+                        generationConfig: { temperature: 0.7, maxOutputTokens: 500 }
+                    })
+                });
+                await readSSEStream(response, async ({ data }) => {
+                    if (!data || data === '[DONE]') return;
+                    const payload = JSON.parse(data);
+                    const text = (payload.candidates || [])
+                        .flatMap(candidate => candidate.content?.parts || [])
+                        .map(part => part.text || '')
+                        .join('');
+                    if (!text) return;
+                    if (text.startsWith(aggregated)) {
+                        const delta = text.slice(aggregated.length);
+                        aggregated = text;
+                        if (delta) onDelta(delta);
+                    } else {
+                        aggregated += text;
+                        onDelta(text);
+                    }
+                });
+            }
+        };
+
+        aiStatusEl.onclick = openAISettingsModal;
+        aiProviderSelect.onchange = () => {
+            const current = getStoredAISettings();
+            const provider = aiProviderSelect.value;
+            const preset = AI_PROVIDER_PRESETS[provider];
+            aiModelInput.value = preset.defaultModel;
+            aiBaseUrlLabel.style.display = provider === 'custom' ? 'flex' : 'none';
+            aiBaseUrlInput.value = current.provider === provider ? current.baseUrl : (preset.baseUrl || '');
+            aiSettingsHint.textContent = preset.hint;
+        };
+        document.getElementById('ai-settings-close').onclick = closeAISettingsModal;
+        document.getElementById('ai-settings-save').onclick = () => {
+            const provider = aiProviderSelect.value;
+            saveAISettings({
+                provider,
+                model: aiModelInput.value.trim() || AI_PROVIDER_PRESETS[provider].defaultModel,
+                apiKey: aiKeyInput.value.trim(),
+                baseUrl: provider === 'custom' ? aiBaseUrlInput.value.trim() : ''
+            });
+            updateAIStatus();
+            closeAISettingsModal();
+        };
+        document.getElementById('ai-settings-clear').onclick = () => {
+            const settings = getStoredAISettings();
+            settings.apiKey = '';
+            saveAISettings(settings);
+            syncAISettingsForm();
+            updateAIStatus();
+        };
+        aiSettingsModal.addEventListener('click', (e) => { if (e.target === aiSettingsModal) closeAISettingsModal(); });
+        updateAIStatus();
 
         // ============================================================================
         // 📅 EDITORIAL CALENDAR UI
@@ -561,67 +850,225 @@
             destroy() { if (this.audio) { this.audio.pause(); this.audio.src = ''; } if (this.recorder && this.isRecording) this.recorder.stop(); }
         }
 
-        class SmartCanvasTool extends BaseTool {
-            constructor(data, isReadOnly, onChange) { super(Object.assign({ title: '', mode: null, lat: 51.505, lng: -0.09, zoom: 13, isLocked: false, lines: [] }, data), isReadOnly, onChange); this.currentColor = '#ef4444'; this.lineLayers = []; }
-            render() {
-                const baseEl = this.renderContainer([]);
-                if (!this.data.mode) {
-                    if (this.readOnly) baseEl.appendChild(el('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--muted-text)', fontSize: '14px' }, textContent: 'Blank Canvas' }));
-                    else {
-                        const fileInput = el('input', { type: 'file', accept: 'image/*', style: { display: 'none' }, onchange: async (e) => { const f = e.target.files[0]; if (f) { const u = URL.createObjectURL(f), img = new Image(); img.onload = async () => { this.data.imgWidth = img.width; this.data.imgHeight = img.height; this.data.mode = 'image'; this.data.baseImageId = crypto.randomUUID(); await mediaStore.saveBlob(this.data.baseImageId, f, 'image'); this.render(); if (this.onChange) this.onChange(); }; img.src = u; } } });
-                        baseEl.appendChild(el('div', { className: 'smart-canvas-selector' }, UI.button('Map Mode', () => { this.data.mode = 'map'; this.render(); if (this.onChange) this.onChange(); }, 'smart-canvas-option'), UI.button('Photo Overlay', () => fileInput.click(), 'smart-canvas-option'), UI.button('Blank Canvas', () => { this.data.mode = 'blank'; this.render(); if (this.onChange) this.onChange(); }, 'smart-canvas-option'), fileInput));
-                    }
-                } else {
-                    this.controlsRow = this.buildControls(); this.relativeFrame = el('div', { className: 'canvas-relative-frame full-bleed' });
-                    if (this.controlsRow) baseEl.appendChild(this.controlsRow); baseEl.appendChild(this.relativeFrame); this.renderMap();
+        class LeafletViewportTool extends BaseTool {
+            constructor(data, isReadOnly, onChange, defaults) {
+                super(Object.assign({}, defaults, data), isReadOnly, onChange);
+                this.map = null;
+                this.objectUrl = null;
+            }
+            renderFrame() {
+                this.relativeFrame = el('div', { className: 'canvas-relative-frame full-bleed' });
+                return this.relativeFrame;
+            }
+            persistViewport() {
+                if (!this.map) return;
+                const center = this.map.getCenter();
+                this.data.lat = center.lat;
+                this.data.lng = center.lng;
+                this.data.zoom = this.map.getZoom();
+            }
+            bindViewportPersistence() {
+                if (!this.map) return;
+                this.map.on('moveend zoomend', () => {
+                    this.persistViewport();
+                    if (this.onChange) this.onChange();
+                });
+            }
+            save() { this.persistViewport(); return this.data; }
+            destroy() {
+                if (this.objectUrl) {
+                    URL.revokeObjectURL(this.objectUrl);
+                    this.objectUrl = null;
                 }
+                if (this.map) {
+                    this.map.remove();
+                    this.map = null;
+                }
+            }
+        }
+
+        class MapTool extends LeafletViewportTool {
+            constructor(data, isReadOnly, onChange) {
+                super(data, isReadOnly, onChange, { title: '', lat: 51.505, lng: -0.09, zoom: 13, isLocked: false, isDrawingActive: false, lines: [], locationResolved: false, locationDenied: false });
+                this.currentColor = '#ef4444';
+                this.lineLayers = [];
+            }
+            render() {
+                const controls = [];
+                if (!this.readOnly) {
+                    this.lockBtn = UI.button(this.data.isLocked ? 'LOCKED' : 'UNLOCK', () => { this.data.isLocked = !this.data.isLocked; this.updateInteractions(); if (this.onChange) this.onChange(); }, this.data.isLocked ? 'active' : '');
+                    this.colorPicker = el('input', { type: 'color', value: this.currentColor, style: { position: 'absolute', opacity: '0', width: '0', height: '0', pointerEvents: 'none' }, oninput: (e) => this.currentColor = e.target.value });
+                    this.drawBtn = UI.button('DRAW', (e) => { e.preventDefault(); e.stopPropagation(); this.data.isDrawingActive = !this.data.isDrawingActive; this.updateInteractions(); if (this.onChange) this.onChange(); });
+                    this.drawBtn.addEventListener('dblclick', (e) => { e.preventDefault(); e.stopPropagation(); this.colorPicker.click(); });
+                    this.clearBtn = UI.button('CLEAR', () => { this.lineLayers.forEach(layer => this.map?.removeLayer(layer)); this.lineLayers = []; this.data.lines = []; if (this.onChange) this.onChange(); });
+                    controls.push(UI.row(this.lockBtn, this.drawBtn, this.clearBtn, this.colorPicker));
+                }
+                const baseEl = this.renderContainer([...controls, this.renderFrame()]);
+                setTimeout(() => this.mountMap(), 0);
                 return el('div', {}, baseEl);
             }
-            buildControls() {
-                if (this.readOnly) return null;
-                this.lockBtn = UI.button(this.data.isLocked ? 'LOCKED' : 'UNLOCK', () => { this.data.isLocked = !this.data.isLocked; this.updateInteractions(); if (this.onChange) this.onChange(); }, this.data.isLocked ? 'active' : '');
-                this.colorPicker = el('input', { type: 'color', value: this.currentColor, style: { position: 'absolute', opacity: '0', width: '0', height: '0', pointerEvents: 'none' }, oninput: (e) => this.currentColor = e.target.value });
-                this.drawBtn = UI.button('DRAW', (e) => { e.preventDefault(); e.stopPropagation(); this.data.isDrawingActive = !this.data.isDrawingActive; this.updateInteractions(); if (this.onChange) this.onChange(); });
-                this.drawBtn.addEventListener('dblclick', (e) => { e.preventDefault(); e.stopPropagation(); this.colorPicker.click(); });
-                this.clearBtn = UI.button('CLEAR', () => { this.lineLayers.forEach(l => this.map?.removeLayer(l)); this.lineLayers = []; this.data.lines = []; if (this.onChange) this.onChange(); });
-                return UI.row(this.lockBtn, this.drawBtn, this.clearBtn, this.colorPicker);
+            async resolveInitialLocation() {
+                if (this.data.locationResolved || this.data.locationDenied || this.readOnly || !navigator.geolocation) return;
+                try {
+                    const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }));
+                    this.data.lat = position.coords.latitude;
+                    this.data.lng = position.coords.longitude;
+                    this.data.zoom = 15;
+                    this.data.locationResolved = true;
+                    if (this.onChange) this.onChange();
+                } catch {
+                    this.data.locationDenied = true;
+                    if (this.onChange) this.onChange();
+                }
             }
-            async renderMap() {
-                this.mediaContainer = el('div', { className: 'leaflet-container' }); this.relativeFrame.appendChild(this.mediaContainer);
-                setTimeout(async () => {
-                    if (!this.mediaContainer.isConnected) return;
-                    if (this.data.mode === 'map') {
-                        this.map = L.map(this.mediaContainer, { zoomControl: false, attributionControl: false }).setView([this.data.lat, this.data.lng], this.data.zoom);
-                        L.tileLayer(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(this.map);
-                    } else {
-                        this.map = L.map(this.mediaContainer, { crs: L.CRS.Simple, zoomControl: false, attributionControl: false, minZoom: -4 });
-                        const imageUrl = this.data.mode === 'image' && this.data.baseImageId ? URL.createObjectURL(await mediaStore.getBlob(this.data.baseImageId)) : '';
-                        if (imageUrl) {
-                            const b = [[0, 0], [this.data.imgHeight || 600, this.data.imgWidth || 800]]; L.imageOverlay(imageUrl, b).addTo(this.map);
-                            if (!this.data.hasInitializedView && !this.readOnly) { this.map.fitBounds(b); this.data.hasInitializedView = true; if (this.onChange) this.onChange(); }
-                            else this.map.setView([this.data.lat || b[1][0] / 2, this.data.lng || b[1][1] / 2], this.data.zoom || 0);
-                        } else this.map.setView([this.data.lat || 0, this.data.lng || 0], this.data.zoom || 0);
-                    }
-                    this.data.lines.forEach(l => this.lineLayers.push(L.polyline(l.points, { color: l.color, weight: l.weight, lineCap: 'round', lineJoin: 'round', smoothFactor: 1.5 }).addTo(this.map)));
-                    this.initDrawingTracker(); this.updateInteractions(); this.map.invalidateSize(); this.map.on('moveend', () => { if (this.onChange) this.onChange(); });
-                }, 100);
+            async mountMap() {
+                if (!this.relativeFrame?.isConnected) return;
+                await this.resolveInitialLocation();
+                this.destroy();
+                this.mediaContainer = el('div', { className: 'leaflet-container' });
+                this.relativeFrame.innerHTML = '';
+                this.relativeFrame.appendChild(this.mediaContainer);
+                this.map = L.map(this.mediaContainer, { zoomControl: false, attributionControl: false }).setView([this.data.lat, this.data.lng], this.data.zoom);
+                L.tileLayer(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(this.map);
+                this.data.lines.forEach(line => this.lineLayers.push(L.polyline(line.points, { color: line.color, weight: line.weight, lineCap: 'round', lineJoin: 'round', smoothFactor: 1.5 }).addTo(this.map)));
+                this.map.invalidateSize();
+                this.bindViewportPersistence();
+                this.initDrawingTracker();
+                this.updateInteractions();
             }
             initDrawingTracker() {
-                if (this.readOnly) return; let isDown = false;
-                this.mediaContainer.addEventListener('pointerdown', (e) => { if (!this.data.isDrawingActive || !this.map) return; isDown = true; this.mediaContainer.setPointerCapture(e.pointerId); this.currentPoints = [this.map.mouseEventToLatLng(e)]; this.currentPolyline = L.polyline(this.currentPoints, { color: this.currentColor, weight: 4 }).addTo(this.map); });
-                this.mediaContainer.addEventListener('pointermove', (e) => { if (isDown && this.currentPolyline) { this.currentPoints.push(this.map.mouseEventToLatLng(e)); this.currentPolyline.setLatLngs(this.currentPoints); } });
-                const end = () => { if (!isDown) return; isDown = false; if (this.currentPolyline && this.data.isDrawingActive) { this.data.lines.push({ color: this.currentColor, weight: 4, points: this.currentPoints.map(p => [p.lat, p.lng]) }); this.lineLayers.push(this.currentPolyline); this.currentPolyline = null; if (this.onChange) this.onChange(); } };
-                this.mediaContainer.addEventListener('pointerup', end); this.mediaContainer.addEventListener('pointercancel', end);
+                if (this.readOnly || !this.mediaContainer) return;
+                let isDown = false;
+                this.mediaContainer.addEventListener('pointerdown', (e) => {
+                    if (!this.data.isDrawingActive || !this.map) return;
+                    isDown = true;
+                    this.mediaContainer.setPointerCapture(e.pointerId);
+                    this.currentPoints = [this.map.mouseEventToLatLng(e)];
+                    this.currentPolyline = L.polyline(this.currentPoints, { color: this.currentColor, weight: 4 }).addTo(this.map);
+                });
+                this.mediaContainer.addEventListener('pointermove', (e) => {
+                    if (isDown && this.currentPolyline) {
+                        this.currentPoints.push(this.map.mouseEventToLatLng(e));
+                        this.currentPolyline.setLatLngs(this.currentPoints);
+                    }
+                });
+                const end = () => {
+                    if (!isDown) return;
+                    isDown = false;
+                    if (this.currentPolyline && this.data.isDrawingActive) {
+                        this.data.lines.push({ color: this.currentColor, weight: 4, points: this.currentPoints.map(point => [point.lat, point.lng]) });
+                        this.lineLayers.push(this.currentPolyline);
+                        this.currentPolyline = null;
+                        if (this.onChange) this.onChange();
+                    }
+                };
+                this.mediaContainer.addEventListener('pointerup', end);
+                this.mediaContainer.addEventListener('pointercancel', end);
             }
             updateInteractions() {
-                if (!this.map || !this.mediaContainer) return; this.mediaContainer.classList.remove('drawing-mode', 'locked-mode');
-                const t = (en) => { const a = en ? 'enable' : 'disable'; this.map.dragging[a](); this.map.touchZoom[a](); this.map.doubleClickZoom[a](); this.map.scrollWheelZoom[a](); this.map.boxZoom[a](); this.map.keyboard[a](); if (this.map.tap) this.map.tap[a](); };
-                if (this.readOnly) { t(false); this.mediaContainer.classList.add('locked-mode'); if (this.controlsRow) this.controlsRow.style.display = 'none'; return; }
-                if (!this.data.isLocked) { this.data.isDrawingActive = false; t(true); this.lockBtn.textContent = 'UNLOCK'; this.lockBtn.classList.remove('active'); this.drawBtn.style.display = 'none'; this.clearBtn.style.display = 'none'; }
-                else { t(false); this.mediaContainer.classList.add('locked-mode'); this.lockBtn.textContent = 'LOCKED'; this.lockBtn.classList.add('active'); this.drawBtn.style.display = 'flex'; this.clearBtn.style.display = 'flex'; if (this.data.isDrawingActive) { this.drawBtn.textContent = 'DRAWING'; this.drawBtn.classList.add('active', 'danger'); this.mediaContainer.classList.add('drawing-mode'); } else { this.drawBtn.textContent = 'DRAW'; this.drawBtn.classList.remove('active', 'danger'); } }
+                if (!this.map || !this.mediaContainer) return;
+                this.mediaContainer.classList.remove('drawing-mode', 'locked-mode');
+                const toggle = (enabled) => {
+                    const method = enabled ? 'enable' : 'disable';
+                    this.map.dragging[method]();
+                    this.map.touchZoom[method]();
+                    this.map.doubleClickZoom[method]();
+                    this.map.scrollWheelZoom[method]();
+                    this.map.boxZoom[method]();
+                    this.map.keyboard[method]();
+                    if (this.map.tap) this.map.tap[method]();
+                };
+                if (this.readOnly) {
+                    toggle(false);
+                    this.mediaContainer.classList.add('locked-mode');
+                    return;
+                }
+                if (!this.data.isLocked) {
+                    this.data.isDrawingActive = false;
+                    toggle(true);
+                    this.lockBtn.textContent = 'UNLOCK';
+                    this.lockBtn.classList.remove('active');
+                    this.drawBtn.style.display = 'none';
+                    this.clearBtn.style.display = 'none';
+                } else {
+                    toggle(false);
+                    this.mediaContainer.classList.add('locked-mode');
+                    this.lockBtn.textContent = 'LOCKED';
+                    this.lockBtn.classList.add('active');
+                    this.drawBtn.style.display = 'flex';
+                    this.clearBtn.style.display = 'flex';
+                    if (this.data.isDrawingActive) {
+                        this.drawBtn.textContent = 'DRAWING';
+                        this.drawBtn.classList.add('active', 'danger');
+                        this.mediaContainer.classList.add('drawing-mode');
+                    } else {
+                        this.drawBtn.textContent = 'DRAW';
+                        this.drawBtn.classList.remove('active', 'danger');
+                    }
+                }
             }
-            save() { if (this.map && this.data.mode) { const c = this.map.getCenter(); this.data.lat = c.lat; this.data.lng = c.lng; this.data.zoom = this.map.getZoom(); } return this.data; }
-            destroy() { if (this.map) { this.map.remove(); this.map = null; } }
+            destroy() {
+                this.lineLayers = [];
+                super.destroy();
+            }
+        }
+
+        class ImageTool extends BaseTool {
+            constructor(data, isReadOnly, onChange) {
+                super(Object.assign({ title: '', baseImageId: null, imgWidth: 0, imgHeight: 0 }, data), isReadOnly, onChange);
+                this.objectUrl = null;
+            }
+            render() {
+                const baseEl = this.renderContainer([]);
+                const controls = [];
+                if (!this.readOnly) {
+                    this.fileInput = el('input', { type: 'file', accept: 'image/*', style: { display: 'none' }, onchange: async (e) => { const file = e.target.files[0]; if (file) await this.loadFile(file); } });
+                    controls.push(UI.button(this.data.baseImageId ? 'replace image' : 'select image', () => this.fileInput.click()));
+                }
+                if (controls.length) baseEl.appendChild(UI.row(...controls, this.fileInput));
+                this.emptyState = el('div', { style: { padding: '24px', textAlign: 'center', color: 'var(--muted-text)', fontSize: '14px' }, textContent: this.readOnly ? 'No image' : 'Select an image to create the block.' });
+                this.frame = el('div', { className: 'image-stage' });
+                baseEl.appendChild(this.emptyState);
+                baseEl.appendChild(this.frame);
+                this.updateVisibility();
+                if (this.data.baseImageId) setTimeout(() => this.mountImage(), 0);
+                return el('div', {}, baseEl);
+            }
+            updateVisibility() {
+                if (this.emptyState) this.emptyState.style.display = this.data.baseImageId ? 'none' : 'block';
+                if (this.frame) this.frame.style.display = this.data.baseImageId ? 'block' : 'none';
+            }
+            async loadFile(file) {
+                const imageUrl = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = async () => {
+                    this.data.imgWidth = img.width;
+                    this.data.imgHeight = img.height;
+                    this.data.baseImageId = this.data.baseImageId || crypto.randomUUID();
+                    this.data.hasInitializedView = false;
+                    await mediaStore.saveBlob(this.data.baseImageId, file, 'image');
+                    this.updateVisibility();
+                    await this.mountImage();
+                    if (this.onChange) this.onChange();
+                    URL.revokeObjectURL(imageUrl);
+                };
+                img.src = imageUrl;
+            }
+            async mountImage() {
+                this.destroy();
+                if (!this.frame?.isConnected || !this.data.baseImageId) return;
+                const blob = await mediaStore.getBlob(this.data.baseImageId);
+                if (!blob) return;
+                this.objectUrl = URL.createObjectURL(blob);
+                this.frame.innerHTML = '';
+                this.frame.appendChild(el('img', { className: 'image-view', src: this.objectUrl, alt: this.data.title || 'Image block' }));
+            }
+            destroy() {
+                if (this.objectUrl) {
+                    URL.revokeObjectURL(this.objectUrl);
+                    this.objectUrl = null;
+                }
+            }
         }
 
         class CalendarTool extends BaseTool {
@@ -662,6 +1109,305 @@
             }
         }
 
+        class WhiteboardTool extends BaseTool {
+            constructor(data, isReadOnly, onChange) {
+                super(Object.assign({ title: '', strokes: [], strokeColor: '#111111', strokeWidth: 3, height: 360, boardWidth: 1600, boardHeight: 1200, viewX: 0, viewY: 0, zoom: 1, mode: 'draw', baseImageId: null, imgWidth: 0, imgHeight: 0 }, data), isReadOnly, onChange);
+                this.resizeObserver = null;
+                this.isDrawing = false;
+                this.currentStroke = null;
+                this.isPanning = false;
+                this.panOrigin = null;
+                this.activePointers = new Map();
+                this.gestureState = null;
+                this.boundPointerMove = null;
+                this.boundPointerUp = null;
+                this.backgroundObjectUrl = null;
+                this.backgroundImage = null;
+            }
+            render() {
+                this.canvas = el('canvas', { className: 'whiteboard-canvas' });
+                this.stage = el('div', { className: `whiteboard-stage ${this.readOnly ? 'whiteboard-readonly' : ''}` }, this.canvas);
+                const controls = [];
+                if (!this.readOnly) {
+                    this.modeBtn = UI.button(this.data.mode === 'draw' ? 'draw mode' : 'pan mode', () => { this.data.mode = this.data.mode === 'draw' ? 'pan' : 'draw'; this.updateControls(); if (this.onChange) this.onChange(); }, this.data.mode === 'draw' ? 'active' : '');
+                    this.colorInput = el('input', { type: 'color', value: this.data.strokeColor, oninput: (e) => { this.data.strokeColor = e.target.value; if (this.onChange) this.onChange(); } });
+                    this.fileInput = el('input', { type: 'file', accept: 'image/*', style: { display: 'none' }, onchange: async (e) => { const file = e.target.files[0]; if (file) await this.importPhoto(file); } });
+                    this.photoBtn = UI.button(this.data.baseImageId ? 'replace photo' : 'import photo', () => this.fileInput.click());
+                    this.clearBtn = UI.button('clear', () => { this.data.strokes = []; this.draw(); if (this.onChange) this.onChange(); });
+                    controls.push(UI.row(this.modeBtn, this.colorInput, this.photoBtn, this.clearBtn, this.fileInput));
+                }
+                const shell = el('div', { className: 'whiteboard-shell' }, ...controls, this.stage);
+                setTimeout(() => this.mountCanvas(), 0);
+                return el('div', {}, this.renderContainer([shell]));
+            }
+            async importPhoto(file) {
+                const imageUrl = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = async () => {
+                    this.data.imgWidth = img.width;
+                    this.data.imgHeight = img.height;
+                    this.data.boardWidth = img.width;
+                    this.data.boardHeight = img.height;
+                    this.data.baseImageId = this.data.baseImageId || crypto.randomUUID();
+                    this.data.viewX = 0;
+                    this.data.viewY = 0;
+                    this.data.zoom = 1;
+                    await mediaStore.saveBlob(this.data.baseImageId, file, 'image');
+                    await this.loadBackgroundImage();
+                    this.draw();
+                    if (this.photoBtn) this.photoBtn.textContent = 'replace photo';
+                    if (this.onChange) this.onChange();
+                    URL.revokeObjectURL(imageUrl);
+                };
+                img.src = imageUrl;
+            }
+            mountCanvas() {
+                if (!this.canvas || !this.stage) return;
+                this.syncCanvasSize();
+                void this.loadBackgroundImage().then(() => this.draw());
+                if (!this.boundPointerMove) this.attachEvents();
+                this.updateControls();
+                if (!this.resizeObserver) {
+                    this.resizeObserver = new ResizeObserver(() => {
+                        this.syncCanvasSize();
+                        this.draw();
+                    });
+                    this.resizeObserver.observe(this.stage);
+                }
+            }
+            syncCanvasSize() {
+                const rect = this.stage.getBoundingClientRect();
+                const width = Math.max(1, Math.floor(rect.width));
+                const height = this.data.height || 360;
+                const dpr = window.devicePixelRatio || 1;
+                this.canvas.width = Math.floor(width * dpr);
+                this.canvas.height = Math.floor(height * dpr);
+                this.canvas.style.height = `${height}px`;
+                this.ctx = this.canvas.getContext('2d');
+                this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            }
+            getViewportMetrics() {
+                const rect = this.canvas.getBoundingClientRect();
+                const width = rect.width || this.canvas.width || 1;
+                const height = rect.height || this.data.height || 360;
+                const scale = Math.min(width / this.data.boardWidth, height / this.data.boardHeight) * this.data.zoom;
+                return { rect, width, height, scale };
+            }
+            getCanvasPoint(evt) {
+                const { rect, scale } = this.getViewportMetrics();
+                return {
+                    x: this.data.viewX + (evt.clientX - rect.left) / scale,
+                    y: this.data.viewY + (evt.clientY - rect.top) / scale
+                };
+            }
+            attachEvents() {
+                this.boundPointerMove = (evt) => this.handlePointerMove(evt);
+                this.boundPointerUp = (evt) => this.finishStroke(evt);
+                this.canvas.addEventListener('pointerdown', (evt) => this.handlePointerDown(evt));
+                this.canvas.addEventListener('wheel', (evt) => this.handleWheel(evt), { passive: false });
+                window.addEventListener('pointermove', this.boundPointerMove);
+                window.addEventListener('pointerup', this.boundPointerUp);
+                window.addEventListener('pointercancel', this.boundPointerUp);
+            }
+            updateControls() {
+                if (!this.modeBtn) return;
+                this.modeBtn.textContent = this.data.mode === 'draw' ? 'draw mode' : 'pan mode';
+                this.modeBtn.className = `raw-btn ${this.data.mode === 'draw' ? 'active' : ''}`;
+                this.canvas.style.cursor = this.readOnly ? 'grab' : (this.data.mode === 'draw' ? 'crosshair' : 'grab');
+            }
+            async loadBackgroundImage() {
+                if (this.backgroundObjectUrl) {
+                    URL.revokeObjectURL(this.backgroundObjectUrl);
+                    this.backgroundObjectUrl = null;
+                }
+                this.backgroundImage = null;
+                if (!this.data.baseImageId) return;
+                const blob = await mediaStore.getBlob(this.data.baseImageId);
+                if (!blob) return;
+                this.backgroundObjectUrl = URL.createObjectURL(blob);
+                this.backgroundImage = await new Promise((resolve) => {
+                    const image = new Image();
+                    image.onload = () => resolve(image);
+                    image.src = this.backgroundObjectUrl;
+                });
+            }
+            getPinchDistance(pointerEntries) {
+                const [first, second] = pointerEntries;
+                return Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY);
+            }
+            beginGesture() {
+                const pointers = [...this.activePointers.values()];
+                if (pointers.length < 2) return;
+                const { rect, scale } = this.getViewportMetrics();
+                const centerX = (pointers[0].clientX + pointers[1].clientX) / 2 - rect.left;
+                const centerY = (pointers[0].clientY + pointers[1].clientY) / 2 - rect.top;
+                this.gestureState = {
+                    distance: this.getPinchDistance(pointers),
+                    centerX,
+                    centerY,
+                    worldX: this.data.viewX + centerX / scale,
+                    worldY: this.data.viewY + centerY / scale,
+                    startViewX: this.data.viewX,
+                    startViewY: this.data.viewY,
+                    startCenterX: centerX,
+                    startCenterY: centerY,
+                    startZoom: this.data.zoom
+                };
+            }
+            handlePointerDown(evt) {
+                evt.preventDefault();
+                this.canvas.setPointerCapture?.(evt.pointerId);
+                this.activePointers.set(evt.pointerId, { clientX: evt.clientX, clientY: evt.clientY });
+                if (this.activePointers.size === 2) {
+                    this.isDrawing = false;
+                    this.currentStroke = null;
+                    this.isPanning = false;
+                    this.beginGesture();
+                    return;
+                }
+                if (this.readOnly || this.data.mode === 'pan') {
+                    this.isPanning = true;
+                    this.panOrigin = { x: evt.clientX, y: evt.clientY, viewX: this.data.viewX, viewY: this.data.viewY };
+                    this.canvas.style.cursor = 'grabbing';
+                    return;
+                }
+                this.isDrawing = true;
+                const point = this.getCanvasPoint(evt);
+                this.currentStroke = { color: this.data.strokeColor, width: this.data.strokeWidth, points: [point] };
+                this.data.strokes.push(this.currentStroke);
+                this.draw();
+            }
+            handlePointerMove(evt) {
+                if (this.activePointers.has(evt.pointerId)) this.activePointers.set(evt.pointerId, { clientX: evt.clientX, clientY: evt.clientY });
+                if (this.gestureState && this.activePointers.size >= 2) {
+                    const pointers = [...this.activePointers.values()];
+                    const distance = this.getPinchDistance(pointers);
+                    const zoomRatio = distance / Math.max(this.gestureState.distance, 1);
+                    const nextZoom = Math.max(0.5, Math.min(6, this.gestureState.startZoom * zoomRatio));
+                    const { rect, width, height } = this.getViewportMetrics();
+                    const centerX = (pointers[0].clientX + pointers[1].clientX) / 2 - rect.left;
+                    const centerY = (pointers[0].clientY + pointers[1].clientY) / 2 - rect.top;
+                    const scale = Math.min(width / this.data.boardWidth, height / this.data.boardHeight) * nextZoom;
+                    this.data.zoom = nextZoom;
+                    this.data.viewX = this.gestureState.worldX - centerX / scale - (centerX - this.gestureState.startCenterX) / scale;
+                    this.data.viewY = this.gestureState.worldY - centerY / scale - (centerY - this.gestureState.startCenterY) / scale;
+                    this.draw();
+                    return;
+                }
+                if (this.isPanning && this.panOrigin) {
+                    const { scale } = this.getViewportMetrics();
+                    this.data.viewX = this.panOrigin.viewX - (evt.clientX - this.panOrigin.x) / scale;
+                    this.data.viewY = this.panOrigin.viewY - (evt.clientY - this.panOrigin.y) / scale;
+                    this.draw();
+                    return;
+                }
+                if (!this.isDrawing || !this.currentStroke) return;
+                this.currentStroke.points.push(this.getCanvasPoint(evt));
+                this.draw();
+            }
+            handleWheel(evt) {
+                evt.preventDefault();
+                const nextZoom = evt.deltaY < 0 ? this.data.zoom * 1.1 : this.data.zoom / 1.1;
+                this.setZoom(nextZoom, evt);
+            }
+            setZoom(nextZoom, evt = null) {
+                const clampedZoom = Math.max(0.5, Math.min(6, nextZoom));
+                const before = this.getViewportMetrics();
+                let focusX = before.width / 2;
+                let focusY = before.height / 2;
+                if (evt) {
+                    focusX = evt.clientX - before.rect.left;
+                    focusY = evt.clientY - before.rect.top;
+                }
+                const worldX = this.data.viewX + focusX / before.scale;
+                const worldY = this.data.viewY + focusY / before.scale;
+                this.data.zoom = clampedZoom;
+                const after = this.getViewportMetrics();
+                this.data.viewX = worldX - focusX / after.scale;
+                this.data.viewY = worldY - focusY / after.scale;
+                this.draw();
+                if (this.onChange) this.onChange();
+            }
+            finishStroke(evt) {
+                if (evt?.pointerId != null) this.activePointers.delete(evt.pointerId);
+                const pointerCount = this.activePointers.size;
+                if (pointerCount >= 2) return;
+                if (pointerCount === 1) {
+                    this.gestureState = null;
+                    const [remainingPointer] = this.activePointers.values();
+                    if (!this.readOnly && this.data.mode === 'draw') {
+                        this.isPanning = false;
+                    } else {
+                        this.isPanning = true;
+                        this.panOrigin = { x: remainingPointer.clientX, y: remainingPointer.clientY, viewX: this.data.viewX, viewY: this.data.viewY };
+                    }
+                }
+                const wasDrawing = this.isDrawing;
+                const wasPanning = this.isPanning;
+                this.isDrawing = false;
+                if (pointerCount === 0) this.isPanning = false;
+                this.currentStroke = null;
+                if (pointerCount === 0) this.panOrigin = null;
+                if (pointerCount === 0) this.gestureState = null;
+                this.updateControls();
+                if (!(wasDrawing || wasPanning)) return;
+                if (this.onChange) this.onChange();
+            }
+            draw() {
+                if (!this.ctx || !this.canvas) return;
+                const { width, height, scale } = this.getViewportMetrics();
+                this.ctx.clearRect(0, 0, width, height);
+                this.ctx.save();
+                if (this.backgroundImage) {
+                    this.ctx.drawImage(this.backgroundImage, (0 - this.data.viewX) * scale, (0 - this.data.viewY) * scale, this.data.boardWidth * scale, this.data.boardHeight * scale);
+                } else {
+                    this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.06)';
+                    this.ctx.lineWidth = 1;
+                    for (let x = 0; x <= this.data.boardWidth; x += 80) {
+                        const sx = (x - this.data.viewX) * scale;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(sx, 0);
+                        this.ctx.lineTo(sx, height);
+                        this.ctx.stroke();
+                    }
+                    for (let y = 0; y <= this.data.boardHeight; y += 80) {
+                        const sy = (y - this.data.viewY) * scale;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(0, sy);
+                        this.ctx.lineTo(width, sy);
+                        this.ctx.stroke();
+                    }
+                }
+                this.data.strokes.forEach(stroke => {
+                    if (!stroke.points?.length) return;
+                    this.ctx.beginPath();
+                    this.ctx.strokeStyle = stroke.color || '#111111';
+                    this.ctx.lineWidth = (stroke.width || 3) * scale;
+                    this.ctx.lineCap = 'round';
+                    this.ctx.lineJoin = 'round';
+                    const first = stroke.points[0];
+                    this.ctx.moveTo((first.x - this.data.viewX) * scale, (first.y - this.data.viewY) * scale);
+                    stroke.points.slice(1).forEach(point => this.ctx.lineTo((point.x - this.data.viewX) * scale, (point.y - this.data.viewY) * scale));
+                    if (stroke.points.length === 1) this.ctx.lineTo((first.x - this.data.viewX) * scale + 0.01, (first.y - this.data.viewY) * scale + 0.01);
+                    this.ctx.stroke();
+                });
+                this.ctx.restore();
+            }
+            save() { return this.data; }
+            destroy() {
+                if (this.resizeObserver) this.resizeObserver.disconnect();
+                if (this.boundPointerMove) window.removeEventListener('pointermove', this.boundPointerMove);
+                if (this.boundPointerUp) {
+                    window.removeEventListener('pointerup', this.boundPointerUp);
+                    window.removeEventListener('pointercancel', this.boundPointerUp);
+                }
+                if (this.backgroundObjectUrl) {
+                    URL.revokeObjectURL(this.backgroundObjectUrl);
+                    this.backgroundObjectUrl = null;
+                }
+            }
+        }
+
         class RecallTool extends BaseTool {
             constructor(data, isReadOnly, onChange) { super(Object.assign({ title: '', searchQuery: '', selectedItem: null }, data), isReadOnly, onChange); }
             render() {
@@ -679,13 +1425,21 @@
             }
             async performSearch() {
                 if (!this.data.searchQuery.trim() || !pgDB.isReady) return this.resultsContainer.innerHTML = '';
-                const res = await pgDB.searchSemantic(this.data.searchQuery, window.currentDateStr, 5); this.resultsContainer.innerHTML = '';
+                const res = await pgDB.searchNotes(this.data.searchQuery, window.currentDateStr, 5); this.resultsContainer.innerHTML = '';
                 if (!res.length) return this.resultsContainer.appendChild(el('div', { className: 'voice-status-text', textContent: 'no matches found.' }));
                 res.forEach(r => this.resultsContainer.appendChild(el('button', { className: 'menu-item', style: { width: '100%', marginBottom: '4px', border: '1px solid var(--baritone-bg)' }, onclick: () => { this.data.selectedItem = { date: r.date, blockId: r.blockId, text: r.searchText }; this.render(); if (this.onChange) this.onChange(); } }, el('span', { textContent: r.searchText.substring(0, 60) + (r.searchText.length > 60 ? '...' : '') }), el('span', { className: 'sub', textContent: r.date }))));
             }
         }
 
-        const TOOLS_MAP = { voice: VoiceTool, smartCanvas: SmartCanvasTool, calendar: CalendarTool, scan: ScanTool, recall: RecallTool };
+        function migrateLegacyToolBlock(block) {
+            if (block.type !== 'smartCanvas') return block;
+            const data = block.data || {};
+            if (data.mode === 'map') return Object.assign({}, block, { type: 'map', data: { title: data.title || '', lat: data.lat, lng: data.lng, zoom: data.zoom, isLocked: data.isLocked || false, isDrawingActive: data.isDrawingActive || false, lines: data.lines || [], locationResolved: true, locationDenied: false } });
+            if (data.mode === 'image') return Object.assign({}, block, { type: 'image', data: { title: data.title || '', baseImageId: data.baseImageId || null, imgWidth: data.imgWidth || 0, imgHeight: data.imgHeight || 0 } });
+            return Object.assign({}, block, { type: 'whiteboard', data: { title: data.title || '', strokes: [], strokeColor: '#111111', strokeWidth: 3, height: 360, boardWidth: 1600, boardHeight: 1200, viewX: 0, viewY: 0, zoom: 1, mode: 'draw' } });
+        }
+
+        const TOOLS_MAP = { voice: VoiceTool, map: MapTool, image: ImageTool, whiteboard: WhiteboardTool, calendar: CalendarTool, scan: ScanTool, recall: RecallTool };
 
         // ============================================================================
         // 🖋 THE LEAN STREAM EDITOR 
@@ -730,7 +1484,8 @@
                 Array.from(this.container.children).filter(c => !c.classList.contains('floating-menu')).forEach(c => c.remove());
                 this.blocks = []; this.slashMenu.close(); this.personaMenu.close();
 
-                (blocksData?.length ? blocksData : [{ type: 'text', data: { text: '' } }]).forEach(b => {
+                (blocksData?.length ? blocksData : [{ type: 'text', data: { text: '' } }]).forEach(rawBlock => {
+                    const b = migrateLegacyToolBlock(rawBlock);
                     if (['text', 'h1', 'h2', 'h3', 'ul', 'ol', 'quote', 'todo', 'todo-checked', 'hr'].includes(b.type)) {
                         this.addBasicBlock(b.type, b.data?.text || '', b.author || 'user', b.id, b.timestamp);
                     } else if (TOOLS_MAP[b.type]) this.addToolBlock(b.type, b.data, b.author || 'user', b.id, b.timestamp, b.isVirtual, b.originalNoteKey, true);
@@ -937,30 +1692,50 @@
             }
 
             async triggerAIPersonas(triggerBlock, triggerContent, aiMentions) {
-                if (!aiEngine || isAILoading) return;
                 const userPrompt = normalizePlainText(triggerContent.textContent);
                 const meContext = pgDB.cache['persona::me']?.blocks?.map(b => normalizePlainText(b.data?.text)).join('\n') || '';
-                const topicalContext = (userPrompt.length > 3 && pgDB.isReady) ? (await pgDB.searchSemantic(userPrompt, window.currentDateStr, 3)).map(h => h.searchText).join('\n\n---\n\n') : '';
+                const topicalContext = userPrompt.length > 3 ? (await pgDB.searchNotes(userPrompt, window.currentDateStr, 3)).map(h => h.searchText).join('\n\n---\n\n') : '';
+
+                try {
+                    AIService.getSettings();
+                } catch (err) {
+                    openAISettingsModal();
+                    this.addBasicBlock('text', `<span style="color:#ef4444">${escapeHTML(err.message)}</span>`, 'system', crypto.randomUUID(), Date.now(), triggerBlock.id);
+                    scheduleSave();
+                    return;
+                }
 
                 let lastInsertId = triggerBlock.id;
                 for (const mention of aiMentions) {
                     const { slug, name } = mention;
                     const aiInstructions = pgDB.cache[`persona::${slug}`]?.blocks?.map(b => normalizePlainText(b.data?.text)).join('\n') || '';
                     
-                    const aiBlock = this.addBasicBlock('text', `<span class="neon-status ai-status loading">${name} thinking...</span>`, slug, crypto.randomUUID(), Date.now(), lastInsertId);
+                    const aiBlock = this.addBasicBlock('text', `<span class="neon-status ai-status loading">${name} streaming...</span>`, slug, crypto.randomUUID(), Date.now(), lastInsertId);
+                    const aiContent = aiBlock.dom.querySelector('.text-content');
                     lastInsertId = aiBlock.id; 
 
                     try {
-                        const response = await aiEngine.chat.completions.create({
-                            messages: [
-                                { role: 'system', content: `You are embodying the persona, topic, or knowledge base of "${name}".\n[Global User Context (@me)]:\n${meContext || 'None'}\n\n[Your Core Knowledge & Instructions]:\n${aiInstructions || `You have no specific notes. Act as a helpful expert on ${name}.`}\n\n[Relevant Past Notes]:\n${topicalContext || 'None'}\n\nCRITICAL INSTRUCTIONS:\n1. Respond directly and concisely.\n2. DO NOT prefix your response with your name.\n3. Embody the knowledge of "${name}".` },
-                                { role: 'user', content: userPrompt }
-                            ], temperature: 0.7, max_tokens: 500
+                        let aiText = '';
+                        activeAIStreams += 1;
+                        updateAIStatus('loading');
+                        aiContent.innerHTML = '';
+                        await AIService.streamCompletion({
+                            systemPrompt: `You are embodying the persona, topic, or knowledge base of "${name}".\n[Global User Context (@me)]:\n${meContext || 'None'}\n\n[Your Core Knowledge & Instructions]:\n${aiInstructions || `You have no specific notes. Act as a helpful expert on ${name}.`}\n\n[Relevant Past Notes]:\n${topicalContext || 'None'}\n\nCRITICAL INSTRUCTIONS:\n1. Respond directly and concisely.\n2. DO NOT prefix your response with your name.\n3. Embody the knowledge of "${name}".`,
+                            userPrompt,
+                            onDelta: (chunk) => {
+                                aiText += chunk;
+                                aiContent.innerHTML = escapeHTML(aiText).replace(/\n/g, '<br>');
+                            }
                         });
-                        const aiText = response.choices[0].message.content || "";
-                        aiBlock.dom.querySelector('.text-content').innerHTML = escapeHTML(aiText).replace(/\n/g, '<br>');
+                        if (!aiText.trim()) aiContent.innerHTML = '<span style="color:#ef4444">empty response.</span>';
                         await this.appendToPersonaPage(slug, userPrompt, aiText);
-                    } catch { aiBlock.dom.querySelector('.text-content').innerHTML = '<span style="color:#ef4444">connection failed.</span>'; }
+                    } catch (err) {
+                        aiContent.innerHTML = `<span style="color:#ef4444">${escapeHTML(err.message || 'connection failed.')}</span>`;
+                        updateAIStatus('error', 'sys.ai.remote.error');
+                    } finally {
+                        activeAIStreams = Math.max(0, activeAIStreams - 1);
+                        if (activeAIStreams === 0) updateAIStatus();
+                    }
                 }
                 scheduleSave();
             }
@@ -982,6 +1757,7 @@
         // APP LIFECYCLE & STORAGE SYNC
         // ============================================================================
         window.isPersonaPage = false; window.currentPersonaSlug = null;
+        let hasLoadedInitialPage = false;
 
         const scheduleSave = debounce(async () => {
             if (!(CONFIG.DEV_ALLOW_PAST_EDITING || window.currentDateStr === todayStr || window.isPersonaPage)) return;
@@ -1004,8 +1780,13 @@
             } else h.textContent = parseLocal(window.currentDateStr).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).toLowerCase();
         }
 
+        async function persistCurrentPageBeforeNavigation() {
+            if (!hasLoadedInitialPage || !pgDB.isReady || !isEditable()) return;
+            try { await pgDB.saveNote(window.currentDateStr, editor.save()); } catch {}
+        }
+
         async function loadDay(dateStr) {
-            if (pgDB.isReady && isEditable()) try { await pgDB.saveNote(window.currentDateStr, editor.save()); } catch{}
+            await persistCurrentPageBeforeNavigation();
             window.isPersonaPage = false; window.currentPersonaSlug = null; window.currentDateStr = dateStr;
             renderDateHeader(); document.getElementById('backlinks-container')?.remove();
             
@@ -1025,12 +1806,14 @@
                 }
             }
             editor.load([...virtuals, ...dayData.blocks]);
+            hasLoadedInitialPage = true;
         }
 
         async function loadPersonaPage(slug) {
-            if (pgDB.isReady && isEditable()) try { await pgDB.saveNote(window.currentDateStr, editor.save()); } catch{}
+            await persistCurrentPageBeforeNavigation();
             window.isPersonaPage = true; window.currentPersonaSlug = slug; window.currentDateStr = `persona::${slug}`;
             renderDateHeader(); editor.load((pgDB.cache[`persona::${slug}`] || { blocks: [] }).blocks);
+            hasLoadedInitialPage = true;
             
             document.getElementById('backlinks-container')?.remove();
             const bl = pgDB.findBacklinks(slug); if (!bl.length) return;
