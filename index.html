@@ -33,6 +33,8 @@
             --baritone-text: #333333;
             --font-main: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Inter", sans-serif;
             --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            --shadow-color: rgba(0, 0, 0, 0.15);
+            --grid-color: rgba(0, 0, 0, 0.05);
         }
 
         @media (prefers-color-scheme: dark) {
@@ -43,6 +45,8 @@
                 --muted-text: #666666;
                 --baritone-bg: #151515;
                 --baritone-text: #cccccc;
+                --shadow-color: rgba(255, 255, 255, 0.1);
+                --grid-color: rgba(255, 255, 255, 0.08);
             }
         }
 
@@ -134,7 +138,7 @@
         .stream-block[class*="-ai"]::before { content: ''; position: absolute; left: -16px; top: 10px; bottom: 10px; width: 3px; background: var(--neon-purple); opacity: 0.5; }
 
         /* --- MENUS --- */
-        .floating-menu { position: absolute; background: var(--bg-color); border: 2px solid var(--text-color); box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.15); z-index: 1000; display: none; flex-direction: column; width: 260px; border-radius: 4px; overflow: hidden; padding: 8px 0; transition: opacity 0.1s; }
+        .floating-menu { position: absolute; background: var(--bg-color); border: 2px solid var(--text-color); box-shadow: 6px 6px 0 var(--shadow-color); z-index: 1000; display: none; flex-direction: column; width: 260px; border-radius: 4px; overflow: hidden; padding: 8px 0; transition: opacity 0.1s; }
         .floating-menu.active { display: flex; }
         .menu-item { padding: 10px 16px; font-family: var(--font-mono); font-size: 13px; font-weight: 700; text-transform: uppercase; cursor: pointer; color: var(--text-color); background: transparent; border: none; text-align: left; display: flex; justify-content: space-between; align-items: center; }
         .menu-item .sub { color: var(--muted-text); font-size: 10px; font-weight: 500; }
@@ -159,8 +163,8 @@
 
         .raw-input { background: transparent; border: none; outline: none; color: var(--text-color); font-family: var(--font-main); font-size: 18px; font-weight: 500; width: 100%; }
         .raw-input::placeholder { color: var(--muted-text); }
-        .raw-btn { background: var(--bg-color); border: 2px solid var(--text-color); color: var(--text-color); font-family: var(--font-mono); font-size: 11px; font-weight: 800; text-transform: uppercase; cursor: pointer; transition: all 0.2s; padding: 8px 12px; border-radius: 2px; box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.15); display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-        .raw-btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.15); }
+        .raw-btn { background: var(--bg-color); border: 2px solid var(--text-color); color: var(--text-color); font-family: var(--font-mono); font-size: 11px; font-weight: 800; text-transform: uppercase; cursor: pointer; transition: all 0.2s; padding: 8px 12px; border-radius: 2px; box-shadow: 4px 4px 0 var(--shadow-color); display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .raw-btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--shadow-color); }
         .raw-btn.active { background: var(--text-color); color: var(--bg-color); }
         .raw-btn.danger { color: #ef4444; border-color: #ef4444; }
         .raw-btn.danger.active { background: #ef4444; border-color: #ef4444; color: #fff; }
@@ -174,7 +178,6 @@
         .smart-canvas-selector { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; justify-content: center; }
         .smart-canvas-option { flex: 1; min-width: 100px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px 16px; background: transparent; border: 2px dashed var(--muted-text); border-radius: 2px; color: var(--text-color); font-family: var(--font-mono); font-size: 13px; font-weight: 700; text-transform: uppercase; cursor: pointer; transition: all 0.2s; }
         .smart-canvas-option:hover { border-color: var(--text-color); border-style: solid; background: var(--text-color); color: var(--bg-color); }
-        .canvas-relative-frame.full-bleed { position: relative; margin-left: -20px; width: calc(100% + 40px); max-width: none; border-radius: 0; overflow: hidden; margin-top: 8px; height: 60vh; min-height: 400px; }
         .leaflet-container { background: var(--bg-color) !important; width: 100%; height: 100% !important; z-index: 1; position: absolute; top: 0; left: 0; }
         .leaflet-container.drawing-mode, .leaflet-container.drawing-mode .leaflet-interactive { cursor: crosshair !important; touch-action: none !important; }
         .leaflet-container.locked-mode { cursor: default !important; }
@@ -193,17 +196,18 @@
         /* --- EDITORIAL CALENDAR MODAL --- */
         .editorial-cal-modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--bg-color-transparent); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 10000; display: none; justify-content: center; align-items: center; padding: 20px; }
         .editorial-cal-modal.active { display: flex; }
-        .cal-modal-panel { background: var(--bg-color); width: 100%; max-width: 400px; padding: 24px; display: flex; flex-direction: column; border: 2px solid var(--text-color); box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.15); max-height: 90vh; overflow-y: auto; }
+        .cal-modal-panel { background: var(--bg-color); width: 100%; max-width: 400px; padding: 24px; display: flex; flex-direction: column; border: 2px solid var(--text-color); box-shadow: 8px 8px 0 var(--shadow-color); max-height: 90vh; overflow-y: auto; }
         .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
         .cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 14px; font-weight: 700; cursor: pointer; background: var(--baritone-bg); color: var(--text-color); transition: background 0.2s, color 0.2s; }
         .cal-day:active, .cal-day.selected { background: var(--text-color); color: var(--bg-color); }
         .cal-day.muted { opacity: 0.15; pointer-events: none; }
         .time-row { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 8px; padding-bottom: 8px; scrollbar-width: none; -ms-overflow-style: none; }
         .time-row::-webkit-scrollbar { display: none; }
-        .time-row .raw-btn { flex: 0 0 auto; scroll-snap-align: center; border-radius: 20px; box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.15); }
-        .time-row .raw-btn:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.15); }
+        .time-row .raw-btn { flex: 0 0 auto; scroll-snap-align: center; border-radius: 20px; box-shadow: 2px 2px 0 var(--shadow-color); }
+        .time-row .raw-btn:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--shadow-color); }
+        
         .whiteboard-shell { display: flex; flex-direction: column; gap: 12px; }
-        .whiteboard-stage { position: relative; width: 100%; min-height: 320px; background: repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(0, 0, 0, 0.05) 28px), repeating-linear-gradient(90deg, transparent, transparent 27px, rgba(0, 0, 0, 0.05) 28px), var(--bg-color); border: 2px solid var(--text-color); overflow: hidden; touch-action: none; }
+        .whiteboard-stage { position: relative; width: 100%; min-height: 320px; background: repeating-linear-gradient(0deg, transparent, transparent 27px, var(--grid-color) 28px), repeating-linear-gradient(90deg, transparent, transparent 27px, var(--grid-color) 28px), var(--bg-color); border: 2px solid var(--text-color); overflow: hidden; touch-action: none; }
         .whiteboard-canvas { display: block; width: 100%; height: 360px; cursor: crosshair; }
         .whiteboard-readonly .whiteboard-canvas { cursor: default; }
         .image-stage { margin-top: 8px; border: 2px solid var(--text-color); background: var(--baritone-bg); overflow: hidden; }
@@ -211,7 +215,7 @@
 
         .ai-settings-modal { position: fixed; inset: 0; background: var(--bg-color-transparent); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 10001; display: none; justify-content: center; align-items: center; padding: 20px; }
         .ai-settings-modal.active { display: flex; }
-        .ai-settings-panel { background: var(--bg-color); width: min(100%, 520px); padding: 24px; border: 2px solid var(--text-color); box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.15); display: flex; flex-direction: column; gap: 16px; max-height: 90vh; overflow-y: auto; }
+        .ai-settings-panel { background: var(--bg-color); width: min(100%, 520px); padding: 24px; border: 2px solid var(--text-color); box-shadow: 8px 8px 0 var(--shadow-color); display: flex; flex-direction: column; gap: 16px; max-height: 90vh; overflow-y: auto; }
         .ai-settings-copy { font-family: var(--font-mono); font-size: 11px; line-height: 1.6; color: var(--muted-text); text-transform: uppercase; }
         .ai-settings-grid { display: grid; gap: 12px; }
         .ai-settings-label { display: flex; flex-direction: column; gap: 6px; font-family: var(--font-mono); font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted-text); }
@@ -974,7 +978,8 @@
                 this.objectUrl = null;
             }
             renderFrame() {
-                this.relativeFrame = el('div', { className: 'canvas-relative-frame full-bleed' });
+                // Unified layout: Uses the whiteboard stage sizing and borders
+                this.relativeFrame = el('div', { className: 'whiteboard-stage', style: { height: '360px' } });
                 return this.relativeFrame;
             }
             persistViewport() {
@@ -1006,23 +1011,31 @@
 
         class MapTool extends LeafletViewportTool {
             constructor(data, isReadOnly, onChange) {
-                super(data, isReadOnly, onChange, { title: '', lat: 51.505, lng: -0.09, zoom: 13, isLocked: false, isDrawingActive: false, lines: [], locationResolved: false, locationDenied: false });
-                this.currentColor = '#ef4444';
+                super(data, isReadOnly, onChange, { title: '', lat: 51.505, lng: -0.09, zoom: 13, isDrawingActive: false, lines: [], locationResolved: false, locationDenied: false });
+                const defaultStrokeColor = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#ffffff' : '#111111';
+                this.currentColor = defaultStrokeColor;
                 this.lineLayers = [];
             }
             render() {
                 const controls = [];
                 if (!this.readOnly) {
-                    this.lockBtn = UI.button(this.data.isLocked ? 'LOCKED' : 'UNLOCK', () => { this.data.isLocked = !this.data.isLocked; this.updateInteractions(); if (this.onChange) this.onChange(); }, this.data.isLocked ? 'active' : '');
-                    this.colorPicker = el('input', { type: 'color', value: this.currentColor, style: { position: 'absolute', opacity: '0', width: '0', height: '0', pointerEvents: 'none' }, oninput: (e) => this.currentColor = e.target.value });
-                    this.drawBtn = UI.button('DRAW', (e) => { e.preventDefault(); e.stopPropagation(); this.data.isDrawingActive = !this.data.isDrawingActive; this.updateInteractions(); if (this.onChange) this.onChange(); });
-                    this.drawBtn.addEventListener('dblclick', (e) => { e.preventDefault(); e.stopPropagation(); this.colorPicker.click(); });
-                    this.clearBtn = UI.button('CLEAR', () => { this.lineLayers.forEach(layer => this.map?.removeLayer(layer)); this.lineLayers = []; this.data.lines = []; if (this.onChange) this.onChange(); });
-                    controls.push(UI.row(this.lockBtn, this.drawBtn, this.clearBtn, this.colorPicker));
+                    // Replaced split lock/draw controls with unified Whiteboard-style toggle
+                    this.modeBtn = UI.button(this.data.isDrawingActive ? 'draw mode' : 'pan mode', () => { 
+                        this.data.isDrawingActive = !this.data.isDrawingActive; 
+                        this.updateInteractions(); 
+                        if (this.onChange) this.onChange(); 
+                    }, this.data.isDrawingActive ? 'active' : '');
+                    
+                    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    const pickerColor = (this.currentColor === '#111111' && isDark) ? '#ffffff' : this.currentColor;
+                    this.colorPicker = el('input', { type: 'color', value: pickerColor, oninput: (e) => { this.currentColor = e.target.value; } });
+                    
+                    this.clearBtn = UI.button('clear', () => { this.lineLayers.forEach(layer => this.map?.removeLayer(layer)); this.lineLayers = []; this.data.lines = []; if (this.onChange) this.onChange(); });
+                    controls.push(UI.row(this.modeBtn, this.colorPicker, this.clearBtn));
                 }
-                const baseEl = this.renderContainer([...controls, this.renderFrame()]);
+                const shell = el('div', { className: 'whiteboard-shell' }, ...controls, this.renderFrame());
                 setTimeout(() => this.mountMap(), 0);
-                return el('div', {}, baseEl);
+                return el('div', {}, this.renderContainer([shell]));
             }
             async resolveInitialLocation() {
                 if (this.data.locationResolved || this.data.locationDenied || this.readOnly || !navigator.geolocation) return;
@@ -1045,9 +1058,19 @@
                 this.mediaContainer = el('div', { className: 'leaflet-container' });
                 this.relativeFrame.innerHTML = '';
                 this.relativeFrame.appendChild(this.mediaContainer);
-                this.map = L.map(this.mediaContainer, { zoomControl: false, attributionControl: false }).setView([this.data.lat, this.data.lng], this.data.zoom);
+                
+                // Disable global scrollwheel zoom to prevent it stealing page scrolls
+                this.map = L.map(this.mediaContainer, { zoomControl: false, attributionControl: false, scrollWheelZoom: false }).setView([this.data.lat, this.data.lng], this.data.zoom);
                 L.tileLayer(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(this.map);
-                this.data.lines.forEach(line => this.lineLayers.push(L.polyline(line.points, { color: line.color, weight: line.weight, lineCap: 'round', lineJoin: 'round', smoothFactor: 1.5 }).addTo(this.map)));
+                
+                const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                this.data.lines.forEach(line => {
+                    let sColor = line.color || '#111111';
+                    if (isDark && sColor === '#111111') sColor = '#ffffff';
+                    else if (!isDark && sColor === '#ffffff') sColor = '#111111';
+                    this.lineLayers.push(L.polyline(line.points, { color: sColor, weight: line.weight, lineCap: 'round', lineJoin: 'round', smoothFactor: 1.5 }).addTo(this.map));
+                });
+                
                 this.map.invalidateSize();
                 this.bindViewportPersistence();
                 this.initDrawingTracker();
@@ -1060,8 +1083,14 @@
                     if (!this.data.isDrawingActive || !this.map) return;
                     isDown = true;
                     this.mediaContainer.setPointerCapture(e.pointerId);
+                    
+                    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    let sColor = this.currentColor;
+                    if (isDark && sColor === '#111111') sColor = '#ffffff';
+                    else if (!isDark && sColor === '#ffffff') sColor = '#111111';
+
                     this.currentPoints = [this.map.mouseEventToLatLng(e)];
-                    this.currentPolyline = L.polyline(this.currentPoints, { color: this.currentColor, weight: 4 }).addTo(this.map);
+                    this.currentPolyline = L.polyline(this.currentPoints, { color: sColor, weight: 4 }).addTo(this.map);
                 });
                 this.mediaContainer.addEventListener('pointermove', (e) => {
                     if (isDown && this.currentPolyline) {
@@ -1090,38 +1119,27 @@
                     this.map.dragging[method]();
                     this.map.touchZoom[method]();
                     this.map.doubleClickZoom[method]();
-                    this.map.scrollWheelZoom[method]();
                     this.map.boxZoom[method]();
                     this.map.keyboard[method]();
                     if (this.map.tap) this.map.tap[method]();
                 };
+                
                 if (this.readOnly) {
                     toggle(false);
                     this.mediaContainer.classList.add('locked-mode');
                     return;
                 }
-                if (!this.data.isLocked) {
-                    this.data.isDrawingActive = false;
-                    toggle(true);
-                    this.lockBtn.textContent = 'UNLOCK';
-                    this.lockBtn.classList.remove('active');
-                    this.drawBtn.style.display = 'none';
-                    this.clearBtn.style.display = 'none';
-                } else {
+                
+                if (this.modeBtn) {
+                    this.modeBtn.textContent = this.data.isDrawingActive ? 'draw mode' : 'pan mode';
+                    this.modeBtn.className = `raw-btn ${this.data.isDrawingActive ? 'active' : ''}`;
+                }
+
+                if (this.data.isDrawingActive) {
                     toggle(false);
-                    this.mediaContainer.classList.add('locked-mode');
-                    this.lockBtn.textContent = 'LOCKED';
-                    this.lockBtn.classList.add('active');
-                    this.drawBtn.style.display = 'flex';
-                    this.clearBtn.style.display = 'flex';
-                    if (this.data.isDrawingActive) {
-                        this.drawBtn.textContent = 'DRAWING';
-                        this.drawBtn.classList.add('active', 'danger');
-                        this.mediaContainer.classList.add('drawing-mode');
-                    } else {
-                        this.drawBtn.textContent = 'DRAW';
-                        this.drawBtn.classList.remove('active', 'danger');
-                    }
+                    this.mediaContainer.classList.add('drawing-mode');
+                } else {
+                    toggle(true);
                 }
             }
             destroy() {
@@ -1228,7 +1246,13 @@
 
         class WhiteboardTool extends BaseTool {
             constructor(data, isReadOnly, onChange) {
-                super(Object.assign({ title: '', strokes: [], strokeColor: '#111111', strokeWidth: 3, height: 360, boardWidth: 1600, boardHeight: 1200, viewX: 0, viewY: 0, zoom: 1, mode: 'draw', baseImageId: null, imgWidth: 0, imgHeight: 0 }, data), isReadOnly, onChange);
+                const defaultStrokeColor = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#ffffff' : '#111111';
+                // Backward compatibility migration for older saved notes
+                if (data && data.baseImageId) {
+                    data.images = [{ id: data.baseImageId, x: 0, y: 0, w: data.imgWidth || data.boardWidth || 1600, h: data.imgHeight || data.boardHeight || 1200 }];
+                    delete data.baseImageId; delete data.imgWidth; delete data.imgHeight;
+                }
+                super(Object.assign({ title: '', strokes: [], strokeColor: defaultStrokeColor, strokeWidth: 3, height: 360, boardWidth: 1600, boardHeight: 1200, viewX: 0, viewY: 0, zoom: 1, mode: 'draw', images: [] }, data), isReadOnly, onChange);
                 this.resizeObserver = null;
                 this.isDrawing = false;
                 this.currentStroke = null;
@@ -1238,8 +1262,8 @@
                 this.gestureState = null;
                 this.boundPointerMove = null;
                 this.boundPointerUp = null;
-                this.backgroundObjectUrl = null;
-                this.backgroundImage = null;
+                this.loadedImages = {};
+                this.objectUrls = [];
             }
             render() {
                 this.canvas = el('canvas', { className: 'whiteboard-canvas' });
@@ -1247,48 +1271,60 @@
                 const controls = [];
                 if (!this.readOnly) {
                     this.modeBtn = UI.button(this.data.mode === 'draw' ? 'draw mode' : 'pan mode', () => { this.data.mode = this.data.mode === 'draw' ? 'pan' : 'draw'; this.updateControls(); if (this.onChange) this.onChange(); }, this.data.mode === 'draw' ? 'active' : '');
-                    this.colorInput = el('input', { type: 'color', value: this.data.strokeColor, oninput: (e) => { this.data.strokeColor = e.target.value; if (this.onChange) this.onChange(); } });
-                    this.fileInput = el('input', { type: 'file', accept: 'image/*', style: { display: 'none' }, onchange: async (e) => { const file = e.target.files[0]; if (file) await this.importPhoto(file); } });
-                    this.photoBtn = UI.button(this.data.baseImageId ? 'replace photo' : 'import photo', () => this.fileInput.click());
-                    this.clearBtn = UI.button('clear', () => { this.data.strokes = []; this.draw(); if (this.onChange) this.onChange(); });
+                    
+                    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    const pickerColor = (this.data.strokeColor === '#111111' && isDark) ? '#ffffff' : this.data.strokeColor;
+                    this.colorInput = el('input', { type: 'color', value: pickerColor, oninput: (e) => { this.data.strokeColor = e.target.value; if (this.onChange) this.onChange(); } });
+                    
+                    this.fileInput = el('input', { type: 'file', accept: 'image/*', multiple: true, style: { display: 'none' }, onchange: async (e) => { 
+                        if (!e.target.files.length) return;
+                        const files = Array.from(e.target.files);
+                        for (let i = 0; i < files.length; i++) await this.importPhoto(files[i], i * 40);
+                        this.fileInput.value = ''; // Reset to allow re-selection
+                    }});
+                    this.photoBtn = UI.button('add images', () => this.fileInput.click());
+                    this.clearBtn = UI.button('clear', () => { this.data.strokes = []; this.data.images = []; this.draw(); if (this.onChange) this.onChange(); });
                     controls.push(UI.row(this.modeBtn, this.colorInput, this.photoBtn, this.clearBtn, this.fileInput));
                 }
                 const shell = el('div', { className: 'whiteboard-shell' }, ...controls, this.stage);
                 setTimeout(() => this.mountCanvas(), 0);
                 return el('div', {}, this.renderContainer([shell]));
             }
-            async importPhoto(file) {
+            async importPhoto(file, offset = 0) {
                 const imageUrl = URL.createObjectURL(file);
                 const img = new Image();
-                img.onload = async () => {
-                    this.data.imgWidth = img.width;
-                    this.data.imgHeight = img.height;
-                    this.data.boardWidth = img.width;
-                    this.data.boardHeight = img.height;
-                    this.data.baseImageId = this.data.baseImageId || crypto.randomUUID();
-                    this.data.viewX = 0;
-                    this.data.viewY = 0;
-                    this.data.zoom = 1;
-                    await mediaStore.saveBlob(this.data.baseImageId, file, 'image');
-                    await this.loadBackgroundImage();
-                    this.draw();
-                    if (this.photoBtn) this.photoBtn.textContent = 'replace photo';
-                    if (this.onChange) this.onChange();
-                    URL.revokeObjectURL(imageUrl);
-                };
-                img.src = imageUrl;
+                return new Promise(resolve => {
+                    img.onload = async () => {
+                        const id = crypto.randomUUID();
+                        const metrics = this.getViewportMetrics();
+                        const cx = this.data.viewX + (metrics.width / 2) / metrics.scale;
+                        const cy = this.data.viewY + (metrics.height / 2) / metrics.scale;
+                        
+                        let w = img.width;
+                        let h = img.height;
+                        const maxW = this.data.boardWidth * 0.8;
+                        if (w > maxW) { h = h * (maxW / w); w = maxW; }
+
+                        this.data.images.push({ id, x: cx - w / 2 + offset, y: cy - h / 2 + offset, w, h });
+
+                        await mediaStore.saveBlob(id, file, 'image');
+                        await this.loadBackgroundImages();
+                        this.draw();
+                        if (this.onChange) this.onChange();
+                        URL.revokeObjectURL(imageUrl);
+                        resolve();
+                    };
+                    img.src = imageUrl;
+                });
             }
             mountCanvas() {
                 if (!this.canvas || !this.stage) return;
                 this.syncCanvasSize();
-                void this.loadBackgroundImage().then(() => this.draw());
+                void this.loadBackgroundImages().then(() => this.draw());
                 if (!this.boundPointerMove) this.attachEvents();
                 this.updateControls();
                 if (!this.resizeObserver) {
-                    this.resizeObserver = new ResizeObserver(() => {
-                        this.syncCanvasSize();
-                        this.draw();
-                    });
+                    this.resizeObserver = new ResizeObserver(() => { this.syncCanvasSize(); this.draw(); });
                     this.resizeObserver.observe(this.stage);
                 }
             }
@@ -1332,21 +1368,22 @@
                 this.modeBtn.className = `raw-btn ${this.data.mode === 'draw' ? 'active' : ''}`;
                 this.canvas.style.cursor = this.readOnly ? 'grab' : (this.data.mode === 'draw' ? 'crosshair' : 'grab');
             }
-            async loadBackgroundImage() {
-                if (this.backgroundObjectUrl) {
-                    URL.revokeObjectURL(this.backgroundObjectUrl);
-                    this.backgroundObjectUrl = null;
+            async loadBackgroundImages() {
+                if (!this.data.images) return;
+                for (const imgData of this.data.images) {
+                    if (!this.loadedImages[imgData.id]) {
+                        const blob = await mediaStore.getBlob(imgData.id);
+                        if (blob) {
+                            const url = URL.createObjectURL(blob);
+                            this.objectUrls.push(url);
+                            this.loadedImages[imgData.id] = await new Promise((resolve) => {
+                                const image = new Image();
+                                image.onload = () => resolve(image);
+                                image.src = url;
+                            });
+                        }
+                    }
                 }
-                this.backgroundImage = null;
-                if (!this.data.baseImageId) return;
-                const blob = await mediaStore.getBlob(this.data.baseImageId);
-                if (!blob) return;
-                this.backgroundObjectUrl = URL.createObjectURL(blob);
-                this.backgroundImage = await new Promise((resolve) => {
-                    const image = new Image();
-                    image.onload = () => resolve(image);
-                    image.src = this.backgroundObjectUrl;
-                });
             }
             getPinchDistance(pointerEntries) {
                 const [first, second] = pointerEntries;
@@ -1432,10 +1469,7 @@
                 const before = this.getViewportMetrics();
                 let focusX = before.width / 2;
                 let focusY = before.height / 2;
-                if (evt) {
-                    focusX = evt.clientX - before.rect.left;
-                    focusY = evt.clientY - before.rect.top;
-                }
+                if (evt) { focusX = evt.clientX - before.rect.left; focusY = evt.clientY - before.rect.top; }
                 const worldX = this.data.viewX + focusX / before.scale;
                 const worldY = this.data.viewY + focusY / before.scale;
                 this.data.zoom = clampedZoom;
@@ -1452,20 +1486,13 @@
                 if (pointerCount === 1) {
                     this.gestureState = null;
                     const [remainingPointer] = this.activePointers.values();
-                    if (!this.readOnly && this.data.mode === 'draw') {
-                        this.isPanning = false;
-                    } else {
-                        this.isPanning = true;
-                        this.panOrigin = { x: remainingPointer.clientX, y: remainingPointer.clientY, viewX: this.data.viewX, viewY: this.data.viewY };
-                    }
+                    if (!this.readOnly && this.data.mode === 'draw') this.isPanning = false;
+                    else { this.isPanning = true; this.panOrigin = { x: remainingPointer.clientX, y: remainingPointer.clientY, viewX: this.data.viewX, viewY: this.data.viewY }; }
                 }
-                const wasDrawing = this.isDrawing;
-                const wasPanning = this.isPanning;
+                const wasDrawing = this.isDrawing, wasPanning = this.isPanning;
                 this.isDrawing = false;
-                if (pointerCount === 0) this.isPanning = false;
+                if (pointerCount === 0) { this.isPanning = false; this.panOrigin = null; this.gestureState = null; }
                 this.currentStroke = null;
-                if (pointerCount === 0) this.panOrigin = null;
-                if (pointerCount === 0) this.gestureState = null;
                 this.updateControls();
                 if (!(wasDrawing || wasPanning)) return;
                 if (this.onChange) this.onChange();
@@ -1473,32 +1500,42 @@
             draw() {
                 if (!this.ctx || !this.canvas) return;
                 const { width, height, scale } = this.getViewportMetrics();
+                const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
                 this.ctx.clearRect(0, 0, width, height);
                 this.ctx.save();
-                if (this.backgroundImage) {
-                    this.ctx.drawImage(this.backgroundImage, (0 - this.data.viewX) * scale, (0 - this.data.viewY) * scale, this.data.boardWidth * scale, this.data.boardHeight * scale);
-                } else {
-                    this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.06)';
-                    this.ctx.lineWidth = 1;
-                    for (let x = 0; x <= this.data.boardWidth; x += 80) {
-                        const sx = (x - this.data.viewX) * scale;
-                        this.ctx.beginPath();
-                        this.ctx.moveTo(sx, 0);
-                        this.ctx.lineTo(sx, height);
-                        this.ctx.stroke();
-                    }
-                    for (let y = 0; y <= this.data.boardHeight; y += 80) {
-                        const sy = (y - this.data.viewY) * scale;
-                        this.ctx.beginPath();
-                        this.ctx.moveTo(0, sy);
-                        this.ctx.lineTo(width, sy);
-                        this.ctx.stroke();
+                
+                // Draw background grid
+                this.ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+                this.ctx.lineWidth = 1;
+                for (let x = 0; x <= this.data.boardWidth; x += 80) {
+                    const sx = (x - this.data.viewX) * scale;
+                    this.ctx.beginPath(); this.ctx.moveTo(sx, 0); this.ctx.lineTo(sx, height); this.ctx.stroke();
+                }
+                for (let y = 0; y <= this.data.boardHeight; y += 80) {
+                    const sy = (y - this.data.viewY) * scale;
+                    this.ctx.beginPath(); this.ctx.moveTo(0, sy); this.ctx.lineTo(width, sy); this.ctx.stroke();
+                }
+
+                // Draw dynamically placed images
+                if (this.data.images) {
+                    for (const imgData of this.data.images) {
+                        const imgEl = this.loadedImages[imgData.id];
+                        if (imgEl) {
+                            this.ctx.drawImage(imgEl, (imgData.x - this.data.viewX) * scale, (imgData.y - this.data.viewY) * scale, imgData.w * scale, imgData.h * scale);
+                        }
                     }
                 }
+
                 this.data.strokes.forEach(stroke => {
                     if (!stroke.points?.length) return;
                     this.ctx.beginPath();
-                    this.ctx.strokeStyle = stroke.color || '#111111';
+                    
+                    let sColor = stroke.color || '#111111';
+                    if (isDark && sColor === '#111111') sColor = '#ffffff';
+                    else if (!isDark && sColor === '#ffffff') sColor = '#111111';
+                    
+                    this.ctx.strokeStyle = sColor;
                     this.ctx.lineWidth = (stroke.width || 3) * scale;
                     this.ctx.lineCap = 'round';
                     this.ctx.lineJoin = 'round';
@@ -1514,14 +1551,10 @@
             destroy() {
                 if (this.resizeObserver) this.resizeObserver.disconnect();
                 if (this.boundPointerMove) window.removeEventListener('pointermove', this.boundPointerMove);
-                if (this.boundPointerUp) {
-                    window.removeEventListener('pointerup', this.boundPointerUp);
-                    window.removeEventListener('pointercancel', this.boundPointerUp);
-                }
-                if (this.backgroundObjectUrl) {
-                    URL.revokeObjectURL(this.backgroundObjectUrl);
-                    this.backgroundObjectUrl = null;
-                }
+                if (this.boundPointerUp) { window.removeEventListener('pointerup', this.boundPointerUp); window.removeEventListener('pointercancel', this.boundPointerUp); }
+                this.objectUrls.forEach(url => URL.revokeObjectURL(url));
+                this.objectUrls = [];
+                this.loadedImages = {};
             }
         }
 
@@ -1945,6 +1978,14 @@
             const [y, m, d] = window.currentDateStr.split('-');
             EditorialCalendar.open(new Date(y, m - 1, d), false, null, (sd) => { const sStr = getLocalYYYYMMDD(sd); if (window.currentDateStr !== sStr) { scheduleSave(); loadDay(sStr); } });
         };
+
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            if (window.editor && window.editor.blocks) {
+                window.editor.blocks.forEach(b => {
+                    if (b.type === 'whiteboard' && b.instance) b.instance.draw();
+                });
+            }
+        });
 
         Promise.all([pgDB.init(), mediaStore.init()]).then(() => loadDay(todayStr));
     </script>
